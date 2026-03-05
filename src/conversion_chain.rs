@@ -14,7 +14,7 @@ impl ConversionChain {
         &self.conversions
     }
 
-    pub fn convert(&self, input: &Vec<String>) -> Vec<String> {
+    pub fn convert(&self, input: &[String]) -> Vec<String> {
         self.conversions
             .iter()
             .fold(input.to_vec(), |output, conversion| {

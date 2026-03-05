@@ -1,4 +1,4 @@
-use std::{cell::{Ref, RefCell}, cmp::min, fs::File, path::Path, rc::Rc};
+use std::{cell::{Ref, RefCell}, fs::File, path::Path, rc::Rc};
 
 use crate::{DictEntry, Error, Lexicon};
 
@@ -16,17 +16,28 @@ pub trait Dict {
     }
 
     fn match_prefix(&self, word: &str) -> Option<Ref<'_, dyn DictEntry>> {
-        let len = min(self.key_max_length(), word.len());
-        word.char_indices()
-            .take(len)
-            .find_map(|(i, _)| self.match_word(&word[i..]))
+        let max_len = self.key_max_length().min(word.len());
+        let mut matched = None;
+        for (i, c) in word.char_indices() {
+            let prefix_end = i + c.len_utf8();
+            if prefix_end > max_len {
+                break;
+            }
+            if let Some(m) = self.match_word(&word[..prefix_end]) {
+                matched = Some(m);
+            }
+        }
+        matched
     }
 
     fn match_all_prefix(&self, word: &str) -> Vec<Ref<'_, dyn DictEntry>> {
-        let len = min(self.key_max_length(), word.len());
-        word.char_indices()
-            .take(len)
-            .filter_map(|(i, _)| self.match_word(&word[i..]))
+        let max_len = self.key_max_length().min(word.len());
+        let prefix_ends: Vec<usize> = word.char_indices()
+            .map(|(i, c)| i + c.len_utf8())
+            .take_while(|&end| end <= max_len)
+            .collect();
+        prefix_ends.into_iter().rev()
+            .filter_map(|end| self.match_word(&word[..end]))
             .collect()
     }
 }

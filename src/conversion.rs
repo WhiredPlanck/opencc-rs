@@ -16,36 +16,27 @@ impl Conversion {
     }
 
     pub fn convert_phrase(&self, phrase: &str) -> String {
-        // let mut result = String::with_capacity(phrase.len());
-        // let mut last_end = 0;
-
-        // for (i, c) in phrase.char_indices() {
-        //     let mut buffer = [0u8; 4];
-        //     let s = c.encode_utf8(&mut buffer);
-        //     if let Some(matched) = self.dict.match_prefix(s) {
-        //         if i > last_end {
-        //             result.push_str(&phrase[last_end..i]);
-        //         }
-        //         result.push_str(&matched.get_default());
-        //         last_end = i + c.len_utf8();
-        //     }
-        // }
-        // if last_end < phrase.len() {
-        //     result.push_str(&phrase[last_end..]);
-        // }
-        // result
-        phrase.chars()
-            .map(|pstr| {
-                let word = pstr.to_string();
-                match self.dict.match_prefix(&word) {
-                    Some(matched) => matched.get_default(),
-                    None => word
+        let mut result = String::with_capacity(phrase.len());
+        let mut start = 0;
+        while start < phrase.len() {
+            let suffix = &phrase[start..];
+            match self.dict.match_prefix(suffix) {
+                Some(matched) => {
+                    let match_len = matched.key().len();
+                    result.push_str(matched.get_default());
+                    start += match_len;
                 }
-            })
-            .collect()
+                None => {
+                    let c = suffix.chars().next().unwrap();
+                    result.push(c);
+                    start += c.len_utf8();
+                }
+            }
+        }
+        result
     }
 
-    pub fn convert_segments(&self, input: &Vec<String>) -> Vec<String> {
+    pub fn convert_segments(&self, input: &[String]) -> Vec<String> {
         input.iter()
             .map(|segment| {
                 self.convert_phrase(segment)

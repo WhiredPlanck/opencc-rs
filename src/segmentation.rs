@@ -22,14 +22,23 @@ impl MaxMatchSegmentaion {
 
 impl Segmentation for MaxMatchSegmentaion {
     fn segment(&self, text: &str) -> Vec<String> {
-        text.chars()
-            .map(|pstr| {
-                let word = pstr.to_string();
-                match self.dict.match_prefix(&word) {
-                    Some(matched) => matched.key(),
-                    None => word
+        let mut result = Vec::new();
+        let mut start = 0;
+        while start < text.len() {
+            let suffix = &text[start..];
+            match self.dict.match_prefix(suffix) {
+                Some(matched) => {
+                    let match_len = matched.key().len();
+                    result.push(text[start..start + match_len].to_owned());
+                    start += match_len;
                 }
-            })
-            .collect()
+                None => {
+                    let c_len = suffix.chars().next().unwrap().len_utf8();
+                    result.push(suffix[..c_len].to_owned());
+                    start += c_len;
+                }
+            }
+        }
+        result
     }
 }

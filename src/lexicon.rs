@@ -5,7 +5,7 @@ use crate::{DictEntry, DictEntryFactory, Error};
 fn parse_key_values(buff: &str, line_num: usize) -> Result<Box<dyn DictEntry>, Error> {
     if let Some((key, values_buff)) = buff.split_once('\t') {
         let values: Vec<String> = values_buff.split(' ')
-            .map(|str| String::from(str))
+            .map(|str| str.to_owned())
             .collect();
         if values.is_empty() {
             Err(Error::InvalidTextDictinary("No value in an item".to_string(), line_num))
@@ -45,9 +45,9 @@ impl Lexicon {
     }
 
     pub fn dupkey(&self) -> Option<String> {
-        for i in 1..self.entries.len() - 1 {
+        for i in 1..self.entries.len() {
             if self.entries[i - 1].key() == self.entries[i].key() {
-                return Some(self.entries[i].key());
+                return Some(self.entries[i].key().to_owned());
             }
         }
         None
