@@ -1,6 +1,6 @@
 use std::{
     cell::{Ref, RefCell},
-    cmp::{max, min},
+    cmp::max,
     collections::HashMap,
     fs::File,
     io::{Read, Write},
@@ -34,8 +34,8 @@ impl MarisaDict {
         let mut key_value_map = HashMap::new();
         for i in 0..that_lexicon.len() {
             let entry = that_lexicon.get(i);
-            keyset.push_back_str(entry.key().as_str()).unwrap();
-            key_value_map.insert(entry.key(), DictEntryFactory::new_from_other(entry));
+            keyset.push_back_str(entry.key()).unwrap();
+            key_value_map.insert(entry.key().to_owned(), DictEntryFactory::new_from_other(entry));
             max_key_length = max(entry.key().len(), max_key_length);
         }
         // Build Marisa Trie
@@ -58,6 +58,13 @@ impl MarisaDict {
             lexicon,
             marisa,
         })
+    }
+}
+
+impl MarisaDict {
+    /// Returns the safe UTF-8 query slice of `word` limited to `max_length` bytes.
+    fn query_str<'a>(&self, word: &'a str) -> &'a str {
+        &word[..word.floor_char_boundary(self.max_length.min(word.len()))]
     }
 }
 
@@ -86,7 +93,7 @@ impl Dict for MarisaDict {
 
     fn match_prefix(&self, word: &str) -> Option<Ref<'_, dyn DictEntry>> {
         let mut agent = Agent::new();
-        agent.set_query_str(&word[..min(self.max_length, word.len())]);
+        agent.set_query_str(self.query_str(word));
         let mut matched = None;
         while self.marisa.common_prefix_search(&mut agent) {
             let guard = self.lexicon.borrow();
@@ -98,7 +105,7 @@ impl Dict for MarisaDict {
 
     fn match_all_prefix(&self, word: &str) -> Vec<Ref<'_, dyn DictEntry>> {
         let mut agent = Agent::new();
-        agent.set_query_str(&word[..min(self.max_length, word.len())]);
+        agent.set_query_str(self.query_str(word));
         let mut matches = Vec::new();
         while self.marisa.common_prefix_search(&mut agent) {
             let guard = self.lexicon.borrow();

@@ -1,20 +1,20 @@
 pub trait DictEntry {
-    fn key(&self) -> String;
-    fn value(&self) -> Option<String>;
+    fn key(&self) -> &str;
+    fn value(&self) -> Option<&str>;
     fn values(&self) -> Vec<String>;
-    fn get_default(&self) -> String;
+    fn get_default(&self) -> &str;
     fn to_string(&self) -> String;
 }
 
 impl Ord for dyn DictEntry {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.key().cmp(&other.key())
+        self.key().cmp(other.key())
     }
 }
 
 impl PartialOrd for dyn DictEntry {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.key().cmp(&other.key()))
+        Some(self.key().cmp(other.key()))
     }
 }
 
@@ -37,11 +37,11 @@ impl NoValueDictEntry {
 }
 
 impl DictEntry for NoValueDictEntry {
-    fn key(&self) -> String {
-        self.key.clone()
+    fn key(&self) -> &str {
+        &self.key
     }
 
-    fn value(&self) -> Option<String> {
+    fn value(&self) -> Option<&str> {
         None
     }
     
@@ -49,8 +49,8 @@ impl DictEntry for NoValueDictEntry {
         Vec::new()
     }
     
-    fn get_default(&self) -> String {
-        self.key.clone()
+    fn get_default(&self) -> &str {
+        &self.key
     }
     
     fn to_string(&self) -> String {
@@ -64,20 +64,20 @@ pub struct StrSingleValueDictEntry {
 }
 
 impl DictEntry for StrSingleValueDictEntry {
-    fn key(&self) -> String {
-        self.key.clone()
+    fn key(&self) -> &str {
+        &self.key
     }
 
-    fn value(&self) -> Option<String> {
-        Some(self.value.clone())
+    fn value(&self) -> Option<&str> {
+        Some(&self.value)
     }
 
     fn values(&self) -> Vec<String> {
         vec![self.value.clone()]
     }
 
-    fn get_default(&self) -> String {
-        self.value.clone()
+    fn get_default(&self) -> &str {
+        &self.value
     }
 
     fn to_string(&self) -> String {
@@ -91,11 +91,11 @@ pub struct StrMultiValueDictEntry {
 }
 
 impl DictEntry for StrMultiValueDictEntry {
-    fn key(&self) -> String {
-        self.key.clone()
+    fn key(&self) -> &str {
+        &self.key
     }
 
-    fn value(&self) -> Option<String> {
+    fn value(&self) -> Option<&str> {
         None
     }
 
@@ -103,11 +103,11 @@ impl DictEntry for StrMultiValueDictEntry {
         self.values.clone()
     }
 
-    fn get_default(&self) -> String {
+    fn get_default(&self) -> &str {
         if self.values.is_empty() {
-            self.key.clone()
+            &self.key
         } else {
-            self.values[0].clone()
+            &self.values[0]
         }
     }
 
@@ -150,15 +150,15 @@ impl DictEntryFactory {
     pub fn new_from_other(other: &dyn DictEntry) -> Box<dyn DictEntry> {
         let values = other.values();
         if values.is_empty() {
-            Box::new(NoValueDictEntry { key: other.key() })
+            Box::new(NoValueDictEntry { key: other.key().to_owned() })
         } else if values.len() == 1 {
             Box::new(StrSingleValueDictEntry {
-                key: other.key(),
+                key: other.key().to_owned(),
                 value: values[0].clone()
             })
         } else {
             Box::new(StrMultiValueDictEntry {
-                key: other.key(),
+                key: other.key().to_owned(),
                 values: values
             })
         }
