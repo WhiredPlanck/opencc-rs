@@ -21,7 +21,7 @@ static OCD2_HEADER: &str = "OPENCC_MARISA_0.2.5";
 pub struct MarisaDict {
     max_length: usize,
     lexicon: Rc<RefCell<Lexicon>>,
-    marisa: Box<Trie>,
+    marisa: Trie,
 }
 
 impl MarisaDict {
@@ -39,7 +39,7 @@ impl MarisaDict {
             max_key_length = max(entry.key().len(), max_key_length);
         }
         // Build Marisa Trie
-        let mut marisa = Box::new(Trie::new());
+        let mut marisa = Trie::new();
         marisa.build(&mut keyset, 0);
         let mut agent = Agent::new();
         agent.set_key_str("");
@@ -120,7 +120,7 @@ impl SerializableDict for MarisaDict {
                 "Invalid OpenCC dictionary header".to_string(),
             ));
         }
-        let mut marisa = Box::new(Trie::new());
+        let mut marisa = Trie::new();
         let file_clone = file.try_clone()?;
         let mut reader = Reader::from_reader(file_clone);
         marisa.read(&mut reader)?;
