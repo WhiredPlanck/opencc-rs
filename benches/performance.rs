@@ -3,17 +3,21 @@ use std::{
     fs::File,
     io::{BufReader, Read},
     path::PathBuf,
+    sync::LazyLock,
 };
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use opencc_rs::SimpleConverter;
+
+static CARGO_MANIFEST_DIR: LazyLock<PathBuf> =
+    LazyLock::new(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")));
 
 fn initialize(config_name: &str) -> SimpleConverter {
     SimpleConverter::build(format!("{}.json", config_name)).unwrap()
 }
 
 fn read_text(filename: &str) -> String {
-    let benchmark_data_dir = PathBuf::from("/home/panda/Projects/Rust/opencc-rs/test/benchmark");
+    let benchmark_data_dir = CARGO_MANIFEST_DIR.join("test/benchmark");
     let data_path = benchmark_data_dir.join(filename);
     let file = File::open(data_path).unwrap();
     let mut reader = BufReader::new(file);

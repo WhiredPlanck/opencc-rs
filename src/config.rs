@@ -152,13 +152,16 @@ impl Config {
 
     fn parse_conversion_chain(
         &self,
-        config: &Vec<ConversionValue>,
+        config: &[ConversionValue],
     ) -> Result<Rc<ConversionChain>, Error> {
-        let mut conversions = Vec::new();
-        for conversion in config {
-            let dict = self.parse_dict(&conversion.dict)?;
-            conversions.push(Conversion::new(dict));
-        }
+        let conversions = config
+            .iter()
+            .map(|conversion| {
+                let dict = self.parse_dict(&conversion.dict)
+                    .expect("Error on parsing dict");
+                Conversion::new(dict)
+            })
+            .collect();
         Ok(Rc::new(ConversionChain::new(conversions)))
     }
 
