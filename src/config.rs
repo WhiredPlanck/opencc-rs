@@ -78,10 +78,9 @@ impl Config {
     }
 
     pub fn build(&mut self, path: impl AsRef<Path>) -> Result<Converter, Error> {
-        if let Some(p) = &self.argv0 {
-            if let Some(parent) = p.parent() {
+        if let Some(p) = &self.argv0 &&
+            let Some(parent) = p.parent() {
                 self.paths.push(PathBuf::from(parent));
-            }
         }
         
         let prefixed_file = self.find_config_file(path)?;
@@ -126,7 +125,7 @@ impl Config {
             DictKind::Group(group) => {
                 let mut dicts = Vec::new();
                 for kind in &group.dicts {
-                    let dict = self.parse_dict(&kind)?;
+                    let dict = self.parse_dict(kind)?;
                     dicts.push(dict);
                 }
                 Ok(Rc::new(DictGroup::new(dicts)))

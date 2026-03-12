@@ -143,7 +143,7 @@ impl SerializableDict for SerializedValues {
 
         // Data
         write_integer(file, value_total_length)?;
-        file.write(value_buf.as_bytes())?;
+        file.write_all(value_buf.as_bytes())?;
 
         let mut value_cursor = 0;
         for entry in lexicon.iter() {

@@ -141,7 +141,7 @@ impl DictEntryFactory {
             Box::new(
                 StrMultiValueDictEntry {
                     key: key.to_string(),
-                    values: values
+                    values
                 }
             )
         }
@@ -159,7 +159,7 @@ impl DictEntryFactory {
         } else {
             Box::new(StrMultiValueDictEntry {
                 key: other.key(),
-                values: values
+                values
             })
         }
 

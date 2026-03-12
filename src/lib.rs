@@ -38,7 +38,7 @@ pub use simple_converter::SimpleConverter;
 pub type opencc_t = *mut c_void;
 
 #[unsafe(no_mangle)]
-pub extern "C" fn opencc_open(config_file_name: *const c_char) -> *mut c_void {
+pub unsafe extern "C" fn opencc_open(config_file_name: *const c_char) -> *mut c_void {
     let name = unsafe { CStr::from_ptr(config_file_name) };
     let path = name.to_str().unwrap();
     let instance = SimpleConverter::build(path).unwrap();
@@ -55,7 +55,7 @@ pub extern "C" fn opencc_close(opencc: opencc_t) -> c_int {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn opencc_convert_utf8(opencc: opencc_t, input: *const c_char, length: size_t) -> *mut c_char {
+pub unsafe extern "C" fn opencc_convert_utf8(opencc: opencc_t, input: *const c_char, length: size_t) -> *mut c_char {
     let instance = unsafe { Box::from_raw(opencc as *mut SimpleConverter) };
     let input = unsafe { CStr::from_ptr(input).to_str().unwrap() };
     let converted = instance.convert(&input[0..length]);

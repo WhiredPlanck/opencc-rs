@@ -150,7 +150,7 @@ impl SerializableDict for MarisaDict {
     }
 
     fn serialize_to_file(&self, file: &mut File) -> Result<(), Error> {
-        file.write(OCD2_HEADER.as_bytes())?;
+        file.write_all(OCD2_HEADER.as_bytes())?;
         let file_clone = file.try_clone()?;
         let mut writer = Writer::from_writer(file_clone);
         self.marisa.write(&mut writer)?;

@@ -60,9 +60,7 @@ impl Dict for DictGroup {
             let entries = dict.match_all_prefix(word);
             for entry in entries {
                 let entry_len = entry.key().len();
-                if !matched.contains_key(&entry_len) {
-                    matched.insert(entry_len, entry);
-                }
+                matched.entry(entry_len).or_insert(entry);
             }
         }
         matched.into_values().collect()
