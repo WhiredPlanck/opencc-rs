@@ -1,8 +1,8 @@
 use std::{cell::RefCell, io::{BufRead, BufReader, Read}, ops::{Index, IndexMut}, rc::Rc};
 
-use crate::{DictEntry, DictEntryFactory, Error};
+use crate::{DictEntry, Error};
 
-fn parse_key_values(buff: &str, line_num: usize) -> Result<Box<dyn DictEntry>, Error> {
+fn parse_key_values(buff: &str, line_num: usize) -> Result<DictEntry, Error> {
     if let Some((key, values_buff)) = buff.split_once('\t') {
         let values: Vec<String> = values_buff.split(' ')
             .map(|str| String::from(str))
@@ -10,9 +10,9 @@ fn parse_key_values(buff: &str, line_num: usize) -> Result<Box<dyn DictEntry>, E
         if values.is_empty() {
             Err(Error::InvalidTextDictinary("No value in an item".to_string(), line_num))
         } else if values.len() == 1 {
-            Ok(DictEntryFactory::new_with_key_and_value(key, &values[0]))
+            Ok(DictEntry::new_with_key_and_value(key, &values[0]))
         } else {
-            Ok(DictEntryFactory::new_with_key_and_values(key, values))
+            Ok(DictEntry::new_with_key_and_values(key, values))
         }
     } else {
         Err(Error::InvalidTextDictinary(format!("Tabular not found {}", buff), line_num))
@@ -20,7 +20,7 @@ fn parse_key_values(buff: &str, line_num: usize) -> Result<Box<dyn DictEntry>, E
 }
 
 pub struct Lexicon {
-    entries: Vec<Box<dyn DictEntry>>
+    entries: Vec<DictEntry>
 }
 
 impl Lexicon {
@@ -28,11 +28,11 @@ impl Lexicon {
         Self { entries: Vec::new() }
     }
 
-    pub fn from_entries(entries: Vec<Box<dyn DictEntry>>) -> Self {
+    pub fn from_entries(entries: Vec<DictEntry>) -> Self {
         Self { entries }
     }
 
-    pub fn add(&mut self, entry: Box<dyn DictEntry>) {
+    pub fn add(&mut self, entry: DictEntry) {
         self.entries.push(entry);
     }
 
@@ -53,21 +53,21 @@ impl Lexicon {
         None
     }
 
-    pub fn get(&self, index: usize) -> &dyn DictEntry {
-        self.entries[index].as_ref()
+    pub fn get(&self, index: usize) -> &DictEntry {
+        &self.entries[index]
     }
 
     pub const fn len(&self) -> usize {
         self.entries.len()
     }
 
-    pub fn iter(&self) -> std::slice::Iter<'_, Box<dyn DictEntry>> {
+    pub fn iter(&self) -> std::slice::Iter<'_, DictEntry> {
         self.entries.iter()
     }
 
     pub fn partition_point<P>(&self, pred: P)-> usize
     where
-        P: FnMut(&Box<dyn DictEntry>) -> bool,
+        P: FnMut(&DictEntry) -> bool,
     {
         self.entries.partition_point(pred)
     }
@@ -87,21 +87,21 @@ impl Lexicon {
 }
 
 impl Index<usize> for Lexicon {
-    type Output = dyn DictEntry;
+    type Output = DictEntry;
 
     fn index(&self, index: usize) -> &Self::Output {
-        self.entries[index].as_ref()
+        &self.entries[index]
     }
 }
 
 impl IndexMut<usize> for Lexicon {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        self.entries[index].as_mut()
+        &mut self.entries[index]
     }
 }
 
 impl IntoIterator for Lexicon {
-    type Item = Box<dyn DictEntry>;
+    type Item = DictEntry;
 
     type IntoIter = std::vec::IntoIter<Self::Item>;
 
@@ -110,8 +110,8 @@ impl IntoIterator for Lexicon {
     }
 }
 
-impl FromIterator<Box<dyn DictEntry>> for Lexicon {
-    fn from_iter<T: IntoIterator<Item = Box<dyn DictEntry>>>(iter: T) -> Self {
+impl FromIterator<DictEntry> for Lexicon {
+    fn from_iter<T: IntoIterator<Item = DictEntry>>(iter: T) -> Self {
         Self { entries: Vec::from_iter(iter) }
     }
 }

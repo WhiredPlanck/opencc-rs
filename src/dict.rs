@@ -11,18 +11,18 @@ pub trait Dict {
 
     fn lexicon(&self) -> Rc<RefCell<Lexicon>>;
 
-    fn match_word(&self, _word: &str) -> Option<Ref<'_, dyn DictEntry>> {
+    fn match_word(&self, _word: &str) -> Option<Ref<'_, DictEntry>> {
         None
     }
 
-    fn match_prefix(&self, word: &str) -> Option<Ref<'_, dyn DictEntry>> {
+    fn match_prefix(&self, word: &str) -> Option<Ref<'_, DictEntry>> {
         let len = min(self.key_max_length(), word.len());
         word.char_indices()
             .take(len)
             .find_map(|(i, _)| self.match_word(&word[i..]))
     }
 
-    fn match_all_prefix(&self, word: &str) -> Vec<Ref<'_, dyn DictEntry>> {
+    fn match_all_prefix(&self, word: &str) -> Vec<Ref<'_, DictEntry>> {
         let len = min(self.key_max_length(), word.len());
         word.char_indices()
             .take(len)

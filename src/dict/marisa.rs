@@ -13,7 +13,7 @@ use rsmarisa::{
 };
 
 use crate::{
-    Dict, DictEntry, DictEntryFactory, Error, Lexicon, SerializableDict, SerializedValues,
+    Dict, DictEntry, Error, Lexicon, SerializableDict, SerializedValues
 };
 
 static OCD2_HEADER: &str = "OPENCC_MARISA_0.2.5";
@@ -35,7 +35,7 @@ impl MarisaDict {
         for i in 0..that_lexicon.len() {
             let entry = that_lexicon.get(i);
             keyset.push_back_str(entry.key().as_str()).unwrap();
-            key_value_map.insert(entry.key(), DictEntryFactory::new_from_other(entry));
+            key_value_map.insert(entry.key(), DictEntry::new_from_other(entry));
             max_key_length = max(entry.key().len(), max_key_length);
         }
         // Build Marisa Trie
@@ -44,7 +44,7 @@ impl MarisaDict {
         let mut agent = Agent::new();
         agent.set_key_str("");
         let mut entries = Vec::new();
-        entries.resize_with(that_lexicon.len(), Box::default);
+        entries.resize_with(that_lexicon.len(), || DictEntry::new_with_key(""));
         while marisa.predictive_search(&mut agent) {
             let key = String::from(agent.key().as_str());
             if let Some(entry) = key_value_map.remove(&key) {
@@ -70,7 +70,7 @@ impl Dict for MarisaDict {
         self.lexicon.clone()
     }
 
-    fn match_word(&self, word: &str) -> Option<Ref<'_, dyn DictEntry>> {
+    fn match_word(&self, word: &str) -> Option<Ref<'_, DictEntry>> {
         if word.len() > self.max_length {
             return None;
         }
@@ -84,7 +84,7 @@ impl Dict for MarisaDict {
         }
     }
 
-    fn match_prefix(&self, word: &str) -> Option<Ref<'_, dyn DictEntry>> {
+    fn match_prefix(&self, word: &str) -> Option<Ref<'_, DictEntry>> {
         let mut agent = Agent::new();
         agent.set_query_str(&word[..min(self.max_length, word.len())]);
         let mut matched = None;
@@ -96,7 +96,7 @@ impl Dict for MarisaDict {
         matched
     }
 
-    fn match_all_prefix(&self, word: &str) -> Vec<Ref<'_, dyn DictEntry>> {
+    fn match_all_prefix(&self, word: &str) -> Vec<Ref<'_, DictEntry>> {
         let mut agent = Agent::new();
         agent.set_query_str(&word[..min(self.max_length, word.len())]);
         let mut matches = Vec::new();
@@ -130,14 +130,14 @@ impl SerializableDict for MarisaDict {
         let mut agent = Agent::new();
         agent.init_state().unwrap();
         agent.set_query_str("");
-        let mut entries: Vec<Box<dyn DictEntry>> = Vec::new();
-        entries.resize_with(value_lexicon.len(), Box::default);
+        let mut entries: Vec<DictEntry> = Vec::new();
+        entries.resize_with(value_lexicon.len(), || DictEntry::new_with_key(""));
         let mut max_length = 0;
         while marisa.predictive_search(&mut agent) {
             let key = agent.key().as_str();
             let id = agent.key().id();
             max_length = max(key.len(), max_length);
-            let entry = DictEntryFactory::new_with_key_and_values(key, value_lexicon[id].values());
+            let entry = DictEntry::new_with_key_and_values(key, value_lexicon[id].values());
             // Don't use `insert` here, it's slow
             entries[id] = entry;
         }

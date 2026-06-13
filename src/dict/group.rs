@@ -1,6 +1,6 @@
 use std::{cell::{Ref, RefCell}, cmp::max, collections::BTreeMap, rc::Rc};
 
-use crate::{Dict, DictEntry, DictEntryFactory, Lexicon};
+use crate::{Dict, DictEntry, Lexicon};
 
 pub struct DictGroup {
     key_max_length: usize,
@@ -34,7 +34,7 @@ impl Dict for DictGroup {
                 let borrowed = lexicon.borrow();
                 borrowed
                     .iter()
-                    .map(|entry| DictEntryFactory::new_from_other(entry.as_ref()))
+                    .map(|entry| DictEntry::new_from_other(entry))
                     .collect::<Vec<_>>()
             })
             .collect();
@@ -42,20 +42,20 @@ impl Dict for DictGroup {
         Rc::new(RefCell::new(all_lexicon))
     }
 
-    fn match_word(&self, word: &str) -> Option<Ref<'_, dyn DictEntry>> {
+    fn match_word(&self, word: &str) -> Option<Ref<'_, DictEntry>> {
         self.dicts
             .iter()
             .find_map(|dict| dict.match_word(word))
     }
 
-    fn match_prefix(&self, word: &str) -> Option<Ref<'_, dyn DictEntry>> {
+    fn match_prefix(&self, word: &str) -> Option<Ref<'_, DictEntry>> {
         self.dicts
             .iter()
             .find_map(|dict| dict.match_prefix(word))
     }
 
-    fn match_all_prefix(&self, word: &str) -> Vec<Ref<'_, dyn DictEntry>> {
-        let mut matched: BTreeMap<usize, Ref<'_, dyn DictEntry>> = BTreeMap::new();
+    fn match_all_prefix(&self, word: &str) -> Vec<Ref<'_, DictEntry>> {
+        let mut matched: BTreeMap<usize, Ref<'_, DictEntry>> = BTreeMap::new();
         for dict in &self.dicts {
             let entries = dict.match_all_prefix(word);
             for entry in entries {

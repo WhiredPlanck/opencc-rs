@@ -7,7 +7,7 @@ use std::{
     rc::Rc,
 };
 
-use crate::{Dict, DictEntryFactory, Error, Lexicon, SerializableDict};
+use crate::{Dict, DictEntry, Error, Lexicon, SerializableDict};
 
 pub struct SerializedValues {
     lexicon: Rc<RefCell<Lexicon>>,
@@ -124,7 +124,7 @@ impl SerializableDict for SerializedValues {
                 let value = String::from_utf8(chunk[..end_idx].to_vec()).unwrap();
                 values.push(value);
             }
-            let entry = DictEntryFactory::new_with_key_and_values("", values);
+            let entry = DictEntry::new_with_key_and_values("", values);
             lexicon.add(entry);
         }
         Ok(Rc::new(Self::from_lexicon(Rc::new(RefCell::new(lexicon)))))

@@ -6,7 +6,7 @@ use std::{
     rc::Rc,
 };
 
-use crate::{Dict, DictEntry, Error, Lexicon, NoValueDictEntry, SerializableDict};
+use crate::{Dict, DictEntry, Error, Lexicon, SerializableDict};
 
 pub struct TextDict {
     max_length: usize,
@@ -48,8 +48,8 @@ impl Dict for TextDict {
         self.max_length
     }
 
-    fn match_word(&self, word: &str) -> Option<Ref<'_, dyn DictEntry>> {
-        let entry: Box<dyn DictEntry> = Box::new(NoValueDictEntry::new(word));
+    fn match_word(&self, word: &str) -> Option<Ref<'_, DictEntry>> {
+        let entry= DictEntry::NoValue { key: word.to_string() };
         let guard = self.lexicon.borrow();
         let index = guard.partition_point(|x| x < &entry);
         if index < guard.len() {
