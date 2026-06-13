@@ -5,14 +5,14 @@ use crate::{Config, ConversionChain, Error, Segmentation};
 
 pub struct Converter {
     _name: String,
-    segmentation: Rc<dyn Segmentation>,
+    segmentation: Segmentation,
     conversion_chain: Rc<ConversionChain>
 }
 
 impl Converter {
     pub fn new(
         name: &str,
-        segmentation: Rc<dyn Segmentation>,
+        segmentation: Segmentation,
         conversion_chain: Rc<ConversionChain>
     ) -> Self {
         Self { _name: name.to_string(), segmentation, conversion_chain }
@@ -31,8 +31,8 @@ impl Converter {
         Self::from_str_with_paths(json, &paths)
     }
 
-    pub fn segmentation(&self) -> Rc<dyn Segmentation> {
-        self.segmentation.clone()
+    pub fn segmentation(&self) -> &Segmentation {
+        &self.segmentation
     }
 
     pub fn conversion_chain(&self) -> &ConversionChain {

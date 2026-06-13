@@ -6,7 +6,7 @@ use std::{
 use serde::Deserialize;
 
 use crate::{
-    Conversion, ConversionChain, Converter, Dict, DictGroup, Error, MarisaDict, MaxMatchSegmentaion, Segmentation, SerializableDict, TextDict
+    Conversion, ConversionChain, Converter, Dict, DictGroup, Error, MarisaDict, Segmentation, SerializableDict, TextDict
 };
 
 #[derive(Deserialize, Debug, Clone)]
@@ -141,11 +141,11 @@ impl Config {
         }
     }
 
-    fn parse_segmentation(&self, config: &SegmentationKind) -> Result<Rc<dyn Segmentation>, Error> {
+    fn parse_segmentation(&self, config: &SegmentationKind) -> Result<Segmentation, Error> {
         match config {
             SegmentationKind::MMSeg(segmentation) => {
                 let dict = self.parse_dict(&segmentation.dict)?;
-                Ok(Rc::new(MaxMatchSegmentaion::new(dict)))
+                Ok(Segmentation::MaxMatch { dict })
             }
         }
     }
