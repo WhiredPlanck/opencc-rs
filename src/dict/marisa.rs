@@ -1,5 +1,5 @@
 use std::{
-    cell::{Ref, RefCell},
+    cell::Ref,
     cmp::{max, min},
     collections::HashMap,
     fs::File,
@@ -20,22 +20,20 @@ static OCD2_HEADER: &str = "OPENCC_MARISA_0.2.5";
 
 pub struct MarisaDict {
     max_length: usize,
-    lexicon: Rc<RefCell<Lexicon>>,
+    lexicon: Rc<Lexicon>,
     marisa: Trie,
 }
 
 impl MarisaDict {
     pub fn from_dict(dict: &dyn Dict) -> Rc<Self> {
-        let binding = dict.lexicon();
-        let that_lexicon = binding.borrow();
+        let that_lexicon = &dict.lexicon();
         let mut max_key_length = 0;
         let mut keyset = Keyset::new();
 
         let mut key_value_map = HashMap::new();
-        for i in 0..that_lexicon.len() {
-            let entry = that_lexicon.get(i);
+        for entry in that_lexicon.iter() {
             keyset.push_back_str(entry.key().as_str()).unwrap();
-            key_value_map.insert(entry.key(), DictEntry::new_from_other(entry));
+            key_value_map.insert(entry.key(), DictEntry::new_from_other(&entry));
             max_key_length = max(entry.key().len(), max_key_length);
         }
         // Build Marisa Trie
@@ -52,7 +50,7 @@ impl MarisaDict {
                 entries[agent.key().id()] = entry;
             }
         }
-        let lexicon = Rc::new(RefCell::new(Lexicon::from_entries(entries)));
+        let lexicon = Rc::new(Lexicon::from_entries(entries));
         Rc::new(Self {
             max_length: max_key_length,
             lexicon,
@@ -66,7 +64,7 @@ impl Dict for MarisaDict {
         self.max_length
     }
 
-    fn lexicon(&self) -> Rc<RefCell<Lexicon>> {
+    fn lexicon(&self) -> Rc<Lexicon> {
         self.lexicon.clone()
     }
 
@@ -74,11 +72,11 @@ impl Dict for MarisaDict {
         if word.len() > self.max_length {
             return None;
         }
-        let guard = self.lexicon.borrow();
+        let lexicon = &self.lexicon;
         let mut agent = Agent::new();
         agent.set_query_str(word);
         if self.marisa.lookup(&mut agent) {
-            Some(Ref::map(guard, |l| &l[agent.key().id()]))
+            Some(lexicon.get(agent.key().id()))
         } else {
             None
         }
@@ -89,9 +87,7 @@ impl Dict for MarisaDict {
         agent.set_query_str(&word[..min(self.max_length, word.len())]);
         let mut matched = None;
         while self.marisa.common_prefix_search(&mut agent) {
-            let guard = self.lexicon.borrow();
-            let value = Ref::map(guard, |l| &l[agent.key().id()]);
-            matched = Some(value);
+            matched = Some(self.lexicon.get(agent.key().id()));
         }
         matched
     }
@@ -101,8 +97,7 @@ impl Dict for MarisaDict {
         agent.set_query_str(&word[..min(self.max_length, word.len())]);
         let mut matches = Vec::new();
         while self.marisa.common_prefix_search(&mut agent) {
-            let guard = self.lexicon.borrow();
-            let value = Ref::map(guard, |l| &l[agent.key().id()]);
+            let value = self.lexicon.get(agent.key().id());
             matches.push(value);
         }
         matches.reverse();
@@ -125,8 +120,7 @@ impl SerializableDict for MarisaDict {
         let mut reader = Reader::from_reader(file_clone);
         marisa.read(&mut reader)?;
         let serialized_values = SerializedValues::new_from_file(file)?;
-        let value_lexicon = serialized_values.lexicon();
-        let value_lexicon = value_lexicon.borrow();
+        let value_lexicon = &serialized_values.lexicon();
         let mut agent = Agent::new();
         agent.init_state().unwrap();
         agent.set_query_str("");
@@ -137,11 +131,11 @@ impl SerializableDict for MarisaDict {
             let key = agent.key().as_str();
             let id = agent.key().id();
             max_length = max(key.len(), max_length);
-            let entry = DictEntry::new_with_key_and_values(key, value_lexicon[id].values());
+            let entry = DictEntry::new_with_key_and_values(key, value_lexicon.get(id).values());
             // Don't use `insert` here, it's slow
             entries[id] = entry;
         }
-        let lexicon = Rc::new(RefCell::new(Lexicon::from_entries(entries)));
+        let lexicon = Rc::new(Lexicon::from_entries(entries));
         Ok(Rc::new(Self {
             max_length,
             lexicon,

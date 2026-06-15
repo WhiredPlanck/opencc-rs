@@ -1,5 +1,4 @@
 use std::{
-    cell::RefCell,
     ffi::CString,
     fs::File,
     io::{Read, Write},
@@ -10,7 +9,7 @@ use std::{
 use crate::{Dict, DictEntry, Error, Lexicon, SerializableDict};
 
 pub struct SerializedValues {
-    lexicon: Rc<RefCell<Lexicon>>,
+    lexicon: Rc<Lexicon>,
 }
 
 fn read_integer<I: Default + Copy + Sized, R: Read>(reader: &mut R) -> Result<I, Error> {
@@ -42,7 +41,7 @@ where
 }
 
 impl SerializedValues {
-    pub fn from_lexicon(lexicon: Rc<RefCell<Lexicon>>) -> Self {
+    pub fn from_lexicon(lexicon: Rc<Lexicon>) -> Self {
         Self { lexicon }
     }
 
@@ -53,7 +52,7 @@ impl SerializedValues {
         value_total_length: &mut u32,
     ) {
         *value_total_length = 0;
-        let lexicon = self.lexicon.borrow();
+        let lexicon = &self.lexicon;
         for entry in lexicon.iter() {
             assert!(!entry.values().is_empty());
             for value in entry.values() {
@@ -94,14 +93,14 @@ impl Dict for SerializedValues {
         0
     }
 
-    fn lexicon(&self) -> Rc<RefCell<Lexicon>> {
+    fn lexicon(&self) -> Rc<Lexicon> {
         self.lexicon.clone()
     }
 }
 
 impl SerializableDict for SerializedValues {
     fn new_from_file(file: &mut File) -> Result<Rc<Self>, crate::Error> {
-        let mut lexicon = Lexicon::new();
+        let mut entries = Vec::new();
         let num_items: u32 = read_integer(file)?;
         let value_total_length: u32 = read_integer(file)?;
         let mut value_buffer = vec![0u8; value_total_length as usize];
@@ -125,14 +124,13 @@ impl SerializableDict for SerializedValues {
                 values.push(value);
             }
             let entry = DictEntry::new_with_key_and_values("", values);
-            lexicon.add(entry);
+            entries.push(entry);
         }
-        Ok(Rc::new(Self::from_lexicon(Rc::new(RefCell::new(lexicon)))))
+        Ok(Rc::new(Self { lexicon: Rc::new(Lexicon::from_entries(entries))} ))
     }
 
     fn serialize_to_file(&self, file: &mut File) -> Result<(), Error> {
-        let guard = self.lexicon();
-        let lexicon = guard.borrow();
+        let lexicon = &self.lexicon();
         let mut value_total_length: u32 = 0;
         let mut value_buf = String::new();
         let mut value_bytes: Vec<u16> = Vec::new();

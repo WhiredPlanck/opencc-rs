@@ -1,4 +1,4 @@
-use std::{cell::{Ref, RefCell}, cmp::max, collections::BTreeMap, rc::Rc};
+use std::{cell::Ref, cmp::max, collections::BTreeMap, rc::Rc};
 
 use crate::{Dict, DictEntry, Lexicon};
 
@@ -26,20 +26,18 @@ impl Dict for DictGroup {
         self.key_max_length
     }
 
-    fn lexicon(&self) -> Rc<RefCell<Lexicon>> {
-        let mut all_lexicon: Lexicon = self.dicts
+    fn lexicon(&self) -> Rc<Lexicon> {
+        let all_lexicon: Lexicon = self.dicts
             .iter()
             .flat_map(|dict| {
-                let lexicon = dict.lexicon();
-                let borrowed = lexicon.borrow();
-                borrowed
+                dict.lexicon()
                     .iter()
-                    .map(|entry| DictEntry::new_from_other(entry))
+                    .map(|entry| DictEntry::new_from_other(&entry))
                     .collect::<Vec<_>>()
             })
             .collect();
         all_lexicon.sort();
-        Rc::new(RefCell::new(all_lexicon))
+        Rc::new(all_lexicon)
     }
 
     fn match_word(&self, word: &str) -> Option<Ref<'_, DictEntry>> {

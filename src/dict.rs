@@ -1,4 +1,4 @@
-use std::{cell::{Ref, RefCell}, cmp::min, fs::File, path::Path, rc::Rc};
+use std::{cell::Ref, cmp::min, fs::File, path::Path, rc::Rc};
 
 use crate::{DictEntry, Error, Lexicon};
 
@@ -9,7 +9,7 @@ pub mod marisa;
 pub trait Dict {
     fn key_max_length(&self) -> usize;
 
-    fn lexicon(&self) -> Rc<RefCell<Lexicon>>;
+    fn lexicon(&self) -> Rc<Lexicon>;
 
     fn match_word(&self, _word: &str) -> Option<Ref<'_, DictEntry>> {
         None
