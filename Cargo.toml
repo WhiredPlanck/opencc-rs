@@ -18,7 +18,7 @@ required-features = ["tools"]
 
 [dependencies]
 libc = "0.2"
-rsmarisa = "0.4"
+rsmarisa = "0.4.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
