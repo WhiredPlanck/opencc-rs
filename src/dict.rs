@@ -11,6 +11,12 @@ pub trait Dict {
 
     fn lexicon(&self) -> Rc<Lexicon>;
 
+    fn dict_group_items(&self) -> Option<&Vec<Rc<dyn Dict>>> {
+        None
+    }
+
+    fn identity(&self) -> usize;
+
     fn match_word(&self, _word: &str) -> Option<Ref<'_, DictEntry>> {
         None
     }
@@ -39,9 +45,9 @@ pub trait SerializableDict {
         self.serialize_to_file(&mut file)
     }
 
-    fn new_from_file(file: &mut File) -> Result<Rc<Self>, Error> where Self: Sized;
+    fn new_from_file(file: &mut File) -> Result<Rc<dyn Dict>, Error> where Self: Sized;
 
-    fn new_from_path(path: &Path) -> Result<Rc<Self>, Error> where Self: Sized {
+    fn new_from_path(path: &Path) -> Result<Rc<dyn Dict>, Error> where Self: Sized {
         let mut file = File::open(path)?;
         Self::new_from_file(&mut file)
     }

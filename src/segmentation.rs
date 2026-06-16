@@ -1,30 +1,30 @@
 use std::rc::Rc;
 
-use crate::Dict;
+use crate::{Dict, PrefixMatch};
 
 pub enum Segmentation {
-    MaxMatch { dict: Rc<dyn Dict> },
+    MaxMatch { dict: Rc<dyn Dict>, prefix_match: PrefixMatch },
 }
 
 impl Segmentation {
     pub fn new(dict: Rc<dyn Dict>) -> Self {
-        Self::MaxMatch { dict }
+        Self::MaxMatch { dict: dict.clone(), prefix_match: PrefixMatch::from_dict(&dict) }
     }
 
     pub fn dict(&self) -> Rc<dyn Dict> {
         match self {
-            Segmentation::MaxMatch { dict } => dict.clone(),
+            Segmentation::MaxMatch { dict, .. } => dict.clone(),
         }
     }
 
     pub fn segment(&self, text: &str) -> Vec<String> {
         match self {
-            Segmentation::MaxMatch { dict } => text
+            Segmentation::MaxMatch { dict: _, prefix_match } => text
                 .chars()
                 .map(|pstr| {
                     let word = pstr.to_string();
-                    match dict.match_prefix(&word) {
-                        Some(matched) => matched.key(),
+                    match prefix_match.match_prefix(&word) {
+                        Some(matched) => matched.key,
                         None => word,
                     }
                 })

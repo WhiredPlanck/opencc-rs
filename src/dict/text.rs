@@ -43,6 +43,10 @@ impl Dict for TextDict {
         self.max_length
     }
 
+    fn identity(&self) -> usize {
+        self as *const Self as usize
+    }
+
     fn match_word(&self, word: &str) -> Option<Ref<'_, DictEntry>> {
         let entry= DictEntry::NoValue { key: word.to_string() };
         let lexicon = &self.lexicon;
@@ -56,7 +60,7 @@ impl Dict for TextDict {
 }
 
 impl SerializableDict for TextDict {
-    fn new_from_file(file: &mut File) -> Result<Rc<TextDict>, Error> {
+    fn new_from_file(file: &mut File) -> Result<Rc<dyn Dict>, Error> {
         match Lexicon::parse_lexicon_from(file) {
             Ok(lexicon) => {
                 lexicon.sort();

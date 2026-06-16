@@ -68,6 +68,10 @@ impl Dict for MarisaDict {
         self.lexicon.clone()
     }
 
+    fn identity(&self) -> usize {
+        self as *const Self as usize
+    }
+
     fn match_word(&self, word: &str) -> Option<Ref<'_, DictEntry>> {
         if word.len() > self.max_length {
             return None;
@@ -106,7 +110,7 @@ impl Dict for MarisaDict {
 }
 
 impl SerializableDict for MarisaDict {
-    fn new_from_file(file: &mut File) -> Result<Rc<Self>, Error> {
+    fn new_from_file(file: &mut File) -> Result<Rc<dyn Dict>, Error> {
         let header_len: usize = OCD2_HEADER.len();
         let mut buffer = vec![0u8; header_len];
         if file.read_exact(&mut buffer).is_err() || str::from_utf8(&buffer)? != OCD2_HEADER

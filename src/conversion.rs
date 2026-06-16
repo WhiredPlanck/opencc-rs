@@ -1,14 +1,15 @@
 use std::rc::Rc;
 
-use crate::Dict;
+use crate::{Dict, PrefixMatch};
 
 pub struct Conversion {
-    dict: Rc<dyn Dict>
+    dict: Rc<dyn Dict>,
+    prefix_match: PrefixMatch
 }
 
 impl Conversion {
     pub fn new(dict: Rc<dyn Dict>) -> Self {
-        Self { dict }
+        Self { dict: dict.clone(), prefix_match: PrefixMatch::from_dict(&dict) }
     }
 
     pub fn dict(&self) -> Rc<dyn Dict> {
@@ -19,8 +20,8 @@ impl Conversion {
         phrase.chars()
             .map(|pstr| {
                 let word = pstr.to_string();
-                match self.dict.match_prefix(&word) {
-                    Some(matched) => matched.get_default(),
+                match self.prefix_match.match_prefix(&word) {
+                    Some(matched) => matched.value,
                     None => word
                 }
             })

@@ -40,6 +40,14 @@ impl Dict for DictGroup {
         Rc::new(all_lexicon)
     }
 
+    fn dict_group_items(&self) -> Option<&Vec<Rc<dyn Dict>>> {
+        Some(&self.dicts)
+    }
+
+    fn identity(&self) -> usize {
+        self as *const Self as usize
+    }
+
     fn match_word(&self, word: &str) -> Option<Ref<'_, DictEntry>> {
         self.dicts
             .iter()

@@ -96,10 +96,14 @@ impl Dict for SerializedValues {
     fn lexicon(&self) -> Rc<Lexicon> {
         self.lexicon.clone()
     }
+
+    fn identity(&self) -> usize {
+        self as *const Self as usize
+    }
 }
 
 impl SerializableDict for SerializedValues {
-    fn new_from_file(file: &mut File) -> Result<Rc<Self>, crate::Error> {
+    fn new_from_file(file: &mut File) -> Result<Rc<dyn Dict>, crate::Error> {
         let mut entries = Vec::new();
         let num_items: u32 = read_integer(file)?;
         let value_total_length: u32 = read_integer(file)?;

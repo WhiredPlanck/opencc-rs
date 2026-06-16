@@ -1,6 +1,5 @@
 use std::{
-    path::{Path, PathBuf},
-    rc::Rc,
+    collections::HashMap, fs, io, path::{Path, PathBuf}, rc::{Rc, Weak}, sync::RwLock, time::UNIX_EPOCH
 };
 
 use serde::Deserialize;
@@ -8,6 +7,20 @@ use serde::Deserialize;
 use crate::{
     Conversion, ConversionChain, Converter, Dict, DictGroup, Error, MarisaDict, Segmentation, SerializableDict, TextDict
 };
+
+fn get_file_cache_key(path: &Path, cache_prefix: &str) -> io::Result<String> {
+    let metadata = fs::metadata(path)?;
+    let modified = metadata.modified()?;
+    let duration = modified.duration_since(UNIX_EPOCH)
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+
+    let secs = duration.as_secs();
+    let nanos = duration.subsec_nanos();
+    let size = metadata.len();
+
+    Ok(format!("{}\n{}\n{}.{:09}\n{}", cache_prefix, path.to_string_lossy(), secs, nanos, size))
+}
 
 #[derive(Deserialize, Debug, Clone)]
 struct ConfigValue {
@@ -54,6 +67,7 @@ struct ConversionValue {
 pub struct Config {
     paths: Vec<PathBuf>,
     argv0: Option<PathBuf>,
+    cache: RwLock<HashMap<String, Weak<dyn Dict>>>
 }
 
 impl Config {
@@ -61,6 +75,7 @@ impl Config {
         Self {
             paths: Vec::new(),
             argv0: None,
+            cache: RwLock::new(HashMap::new())
         }
     }
 
@@ -100,24 +115,53 @@ impl Config {
         Ok(Converter::new(&name, segmentation, conversion_chain))
     }
 
-    fn load_dict_with_paths<D: SerializableDict, P: AsRef<Path>>(
+    fn prune_expired_dict_cache(&self) {
+        let mut cache = self.cache.write().unwrap();
+        cache.retain(|_, dict| dict.upgrade().is_some());
+    }
+
+    fn load_dict_with_paths<D: SerializableDict>(
         &self,
-        path: P,
-    ) -> Result<Rc<D>, Error> {
-        // Working directory
-        let dict = D::new_from_path(path.as_ref());
-        if dict.is_ok() {
-            return dict;
-        }
+        cache_prefix: &str,
+        filename: &str
+    ) -> Result<Rc<dyn Dict>, Error> {
+        let mut candidates = vec![PathBuf::from(filename)];
         for dir_path in &self.paths {
-            let path = dir_path.join(&path);
-            let dict = D::new_from_path(&path);
-            if dict.is_ok() {
-                return dict;
+            let path = dir_path.join(filename);
+            candidates.push(path);
+        }
+
+        for path in &candidates {
+            let cache_key = get_file_cache_key(path, cache_prefix);
+            if cache_key.is_err() {
+                continue;
+            }
+            let cache_key = cache_key.unwrap();
+            {
+                self.prune_expired_dict_cache();
+                let cache = self.cache.read().unwrap();
+
+                if let Some(cached) = cache.get(&cache_key) {
+                    if let Some(dict) = cached.upgrade() {
+                        return Ok(dict);
+                    }
+                }
+            }
+
+            if let Ok(dict) = D::new_from_path(filename.as_ref()) {
+                self.prune_expired_dict_cache();
+                {
+                    let cache = self.cache.read().unwrap();
+                    if let Some(cached_dict) = cache.get(&cache_key).and_then(Weak::upgrade) {
+                        return Ok(cached_dict);
+                    }
+                }
+                let mut cache = self.cache.write().unwrap();
+                cache.insert(cache_key, Rc::downgrade(&dict));
+                return Ok(dict);
             }
         }
-        let filename = path.as_ref().to_string_lossy().into_owned();
-        Err(Error::FileNotFound(filename))
+        Err(Error::FileNotFound(filename.to_string()))
     }
 
     fn parse_dict(&self, config: &DictKind) -> Result<Rc<dyn Dict>, Error> {
@@ -131,11 +175,11 @@ impl Config {
                 Ok(Rc::new(DictGroup::new(dicts)))
             }
             DictKind::Text(dict) => {
-                let dict: Rc<TextDict> = self.load_dict_with_paths(&dict.file)?;
+                let dict = self.load_dict_with_paths::<TextDict>("text", &dict.file)?;
                 Ok(MarisaDict::from_dict(dict.as_ref()))
             }
             DictKind::Ocd2(dict) => {
-                let dict: Rc<MarisaDict> = self.load_dict_with_paths(&dict.file)?;
+                let dict = self.load_dict_with_paths::<MarisaDict>("ocd2", &dict.file)?;
                 Ok(dict)
             } // _ => unimplemented!(),
         }
@@ -145,7 +189,7 @@ impl Config {
         match config {
             SegmentationKind::MMSeg(segmentation) => {
                 let dict = self.parse_dict(&segmentation.dict)?;
-                Ok(Segmentation::MaxMatch { dict })
+                Ok(Segmentation::new(dict))
             }
         }
     }
