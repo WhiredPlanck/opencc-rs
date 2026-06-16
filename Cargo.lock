@@ -468,6 +468,7 @@ dependencies = [
  "clap",
  "criterion",
  "libc",
+ "once_cell",
  "rsmarisa",
  "serde",
  "serde_json",

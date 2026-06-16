@@ -1,12 +1,21 @@
 use std::{
-    collections::HashMap, fs, io, path::{Path, PathBuf}, rc::{Rc, Weak}, sync::RwLock, time::UNIX_EPOCH
+    collections::HashMap, fs, io, path::{Path, PathBuf}, sync::{Arc, RwLock, Weak}, time::UNIX_EPOCH
 };
 
+use once_cell::sync::Lazy;
 use serde::Deserialize;
 
 use crate::{
     Conversion, ConversionChain, Converter, Dict, DictGroup, Error, MarisaDict, Segmentation, SerializableDict, TextDict
 };
+
+static DICT_CACHE: Lazy<RwLock<HashMap<String, Weak<dyn Dict>>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
+
+fn prune_expired_dict_cache() {
+    let mut cache = DICT_CACHE.write().unwrap();
+    cache.retain(|_, dict| dict.upgrade().is_some());
+}
 
 fn get_file_cache_key(path: &Path, cache_prefix: &str) -> io::Result<String> {
     let metadata = fs::metadata(path)?;
@@ -66,16 +75,14 @@ struct ConversionValue {
 
 pub struct Config {
     paths: Vec<PathBuf>,
-    argv0: Option<PathBuf>,
-    cache: RwLock<HashMap<String, Weak<dyn Dict>>>
+    argv0: Option<PathBuf>
 }
 
 impl Config {
     pub fn new() -> Self {
         Self {
             paths: Vec::new(),
-            argv0: None,
-            cache: RwLock::new(HashMap::new())
+            argv0: None
         }
     }
 
@@ -115,16 +122,11 @@ impl Config {
         Ok(Converter::new(&name, segmentation, conversion_chain))
     }
 
-    fn prune_expired_dict_cache(&self) {
-        let mut cache = self.cache.write().unwrap();
-        cache.retain(|_, dict| dict.upgrade().is_some());
-    }
-
     fn load_dict_with_paths<D: SerializableDict>(
         &self,
         cache_prefix: &str,
         filename: &str
-    ) -> Result<Rc<dyn Dict>, Error> {
+    ) -> Result<Arc<dyn Dict>, Error> {
         let mut candidates = vec![PathBuf::from(filename)];
         for dir_path in &self.paths {
             let path = dir_path.join(filename);
@@ -138,9 +140,8 @@ impl Config {
             }
             let cache_key = cache_key.unwrap();
             {
-                self.prune_expired_dict_cache();
-                let cache = self.cache.read().unwrap();
-
+                prune_expired_dict_cache();
+                let cache = DICT_CACHE.read().unwrap();
                 if let Some(cached) = cache.get(&cache_key) {
                     if let Some(dict) = cached.upgrade() {
                         return Ok(dict);
@@ -149,22 +150,22 @@ impl Config {
             }
 
             if let Ok(dict) = D::new_from_path(filename.as_ref()) {
-                self.prune_expired_dict_cache();
+                prune_expired_dict_cache();
                 {
-                    let cache = self.cache.read().unwrap();
+                    let cache = DICT_CACHE.read().unwrap();
                     if let Some(cached_dict) = cache.get(&cache_key).and_then(Weak::upgrade) {
                         return Ok(cached_dict);
                     }
                 }
-                let mut cache = self.cache.write().unwrap();
-                cache.insert(cache_key, Rc::downgrade(&dict));
+                let mut cache = DICT_CACHE.write().unwrap();
+                cache.insert(cache_key, Arc::downgrade(&dict));
                 return Ok(dict);
             }
         }
         Err(Error::FileNotFound(filename.to_string()))
     }
 
-    fn parse_dict(&self, config: &DictKind) -> Result<Rc<dyn Dict>, Error> {
+    fn parse_dict(&self, config: &DictKind) -> Result<Arc<dyn Dict>, Error> {
         match config {
             DictKind::Group(group) => {
                 let mut dicts = Vec::new();
@@ -172,11 +173,11 @@ impl Config {
                     let dict = self.parse_dict(kind)?;
                     dicts.push(dict);
                 }
-                Ok(Rc::new(DictGroup::new(dicts)))
+                Ok(Arc::new(DictGroup::new(dicts)))
             }
             DictKind::Text(dict) => {
                 let dict = self.load_dict_with_paths::<TextDict>("text", &dict.file)?;
-                Ok(MarisaDict::from_dict(dict.as_ref()))
+                Ok(Arc::new(MarisaDict::from_dict(dict.as_ref())))
             }
             DictKind::Ocd2(dict) => {
                 let dict = self.load_dict_with_paths::<MarisaDict>("ocd2", &dict.file)?;
@@ -197,7 +198,7 @@ impl Config {
     fn parse_conversion_chain(
         &self,
         config: &[ConversionValue],
-    ) -> Result<Rc<ConversionChain>, Error> {
+    ) -> Result<ConversionChain, Error> {
         let conversions = config
             .iter()
             .map(|conversion| {
@@ -206,7 +207,7 @@ impl Config {
                 Conversion::new(dict)
             })
             .collect();
-        Ok(Rc::new(ConversionChain::new(conversions)))
+        Ok(ConversionChain::new(conversions))
     }
 
     fn find_config_file(&self, path: impl AsRef<Path>) -> Result<PathBuf, Error> {

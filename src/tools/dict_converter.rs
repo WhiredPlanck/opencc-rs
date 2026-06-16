@@ -1,4 +1,4 @@
-use std::{path::{Path, PathBuf}, rc::Rc};
+use std::{path::{Path, PathBuf}, sync::Arc};
 
 use clap::{Parser, ValueEnum};
 use opencc_rs::{Dict, MarisaDict, SerializableDict, TextDict};
@@ -25,17 +25,17 @@ enum DictFormat {
     Ocd2
 }
 
-fn load_dictionary(format: DictFormat, input_path: &Path) -> Rc<dyn Dict> {
+fn load_dictionary(format: DictFormat, input_path: &Path) -> Arc<dyn Dict> {
     match format {
         DictFormat::Text => TextDict::new_from_path(input_path).unwrap(),
         DictFormat::Ocd2 => MarisaDict::new_from_path(input_path).unwrap()
     }
 }
 
-fn convert_dict(format: DictFormat, dict: Rc<dyn Dict>) -> Rc<dyn SerializableDict> {
+fn convert_dict(format: DictFormat, dict: Arc<dyn Dict>) -> Box<dyn SerializableDict> {
     match format {
-        DictFormat::Text => TextDict::from_dict(dict.as_ref()),
-        DictFormat::Ocd2 => MarisaDict::from_dict(dict.as_ref())
+        DictFormat::Text => Box::new(TextDict::from_dict(dict.as_ref())),
+        DictFormat::Ocd2 => Box::new(MarisaDict::from_dict(dict.as_ref()))
     }
 }
 

@@ -1,14 +1,14 @@
-use std::{cell::Ref, cmp::max, collections::BTreeMap, rc::Rc};
+use std::{cmp::max, collections::BTreeMap, sync::Arc};
 
 use crate::{Dict, DictEntry, Lexicon};
 
 pub struct DictGroup {
     key_max_length: usize,
-    dicts: Vec<Rc<dyn Dict>>
+    dicts: Vec<Arc<dyn Dict>>
 }
 
 impl DictGroup {
-    pub fn new(dicts: Vec<Rc<dyn Dict>>) -> Self {
+    pub fn new(dicts: Vec<Arc<dyn Dict>>) -> Self {
         let key_max_length = dicts.iter()
             .fold(0, |acc, e| {
                 max(acc, e.key_max_length())
@@ -16,7 +16,7 @@ impl DictGroup {
         Self { key_max_length, dicts }
     }
 
-    pub fn dicts(&self) -> &Vec<Rc<dyn Dict>> {
+    pub fn dicts(&self) -> &Vec<Arc<dyn Dict>> {
         &self.dicts
     }
 }
@@ -26,8 +26,8 @@ impl Dict for DictGroup {
         self.key_max_length
     }
 
-    fn lexicon(&self) -> Rc<Lexicon> {
-        let all_lexicon: Lexicon = self.dicts
+    fn lexicon(&self) -> Arc<Lexicon> {
+        let mut all_lexicon: Lexicon = self.dicts
             .iter()
             .flat_map(|dict| {
                 dict.lexicon()
@@ -37,10 +37,10 @@ impl Dict for DictGroup {
             })
             .collect();
         all_lexicon.sort();
-        Rc::new(all_lexicon)
+        Arc::new(all_lexicon)
     }
 
-    fn dict_group_items(&self) -> Option<&Vec<Rc<dyn Dict>>> {
+    fn dict_group_items(&self) -> Option<&Vec<Arc<dyn Dict>>> {
         Some(&self.dicts)
     }
 
@@ -48,20 +48,20 @@ impl Dict for DictGroup {
         self as *const Self as usize
     }
 
-    fn match_word(&self, word: &str) -> Option<Ref<'_, DictEntry>> {
+    fn match_word(&self, word: &str) -> Option<&DictEntry> {
         self.dicts
             .iter()
             .find_map(|dict| dict.match_word(word))
     }
 
-    fn match_prefix(&self, word: &str) -> Option<Ref<'_, DictEntry>> {
+    fn match_prefix(&self, word: &str) -> Option<&DictEntry> {
         self.dicts
             .iter()
             .find_map(|dict| dict.match_prefix(word))
     }
 
-    fn match_all_prefix(&self, word: &str) -> Vec<Ref<'_, DictEntry>> {
-        let mut matched: BTreeMap<usize, Ref<'_, DictEntry>> = BTreeMap::new();
+    fn match_all_prefix(&self, word: &str) -> Vec<&DictEntry> {
+        let mut matched: BTreeMap<usize, &DictEntry> = BTreeMap::new();
         for dict in &self.dicts {
             let entries = dict.match_all_prefix(word);
             for entry in entries {

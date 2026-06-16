@@ -1,16 +1,16 @@
 use std::{
-    cell::Ref, cmp::max, fs::File, io::{Read, Write}, rc::Rc
+    cmp::max, fs::File, io::{Read, Write}, sync::Arc
 };
 
 use crate::{Dict, DictEntry, Error, Lexicon, SerializableDict};
 
 pub struct TextDict {
     max_length: usize,
-    lexicon: Rc<Lexicon>,
+    lexicon: Arc<Lexicon>,
 }
 
 impl TextDict {
-    pub fn from_lexicon(lexicon: Rc<Lexicon>) -> Self {
+    pub fn from_lexicon(lexicon: Arc<Lexicon>) -> Self {
         let max_length = lexicon
             .iter()
             .fold(0, |acc, entry| max(acc, entry.key().len()));
@@ -22,20 +22,20 @@ impl TextDict {
         }
     }
 
-    pub fn from_sorted<R: Read>(reader: R) -> Result<Rc<TextDict>, Error> {
+    pub fn from_sorted<R: Read>(reader: R) -> Result<Self, Error> {
         match Lexicon::parse_lexicon_from(reader) {
-            Ok(lexicon) => Ok(Rc::new(TextDict::from_lexicon(lexicon))),
+            Ok(lexicon) => Ok(TextDict::from_lexicon(Arc::new(lexicon))),
             Err(e) => Err(e),
         }
     }
 
-    pub fn from_dict(dict: &dyn Dict) -> Rc<Self> {
-        Rc::new(TextDict::from_lexicon(dict.lexicon()))
+    pub fn from_dict(dict: &dyn Dict) -> Self {
+        TextDict::from_lexicon(dict.lexicon())
     }
 }
 
 impl Dict for TextDict {
-    fn lexicon(&self) -> Rc<Lexicon> {
+    fn lexicon(&self) -> Arc<Lexicon> {
         self.lexicon.clone()
     }
 
@@ -47,7 +47,7 @@ impl Dict for TextDict {
         self as *const Self as usize
     }
 
-    fn match_word(&self, word: &str) -> Option<Ref<'_, DictEntry>> {
+    fn match_word(&self, word: &str) -> Option<&DictEntry> {
         let entry= DictEntry::NoValue { key: word.to_string() };
         let lexicon = &self.lexicon;
         let index = lexicon.partition_point(|x| x < &entry);
@@ -60,9 +60,9 @@ impl Dict for TextDict {
 }
 
 impl SerializableDict for TextDict {
-    fn new_from_file(file: &mut File) -> Result<Rc<dyn Dict>, Error> {
+    fn new_from_file(file: &mut File) -> Result<Arc<dyn Dict>, Error> {
         match Lexicon::parse_lexicon_from(file) {
-            Ok(lexicon) => {
+            Ok(mut lexicon) => {
                 lexicon.sort();
                 let mut dupkey = String::new();
                 if lexicon.is_unique(Some(&mut dupkey)) {
@@ -71,7 +71,7 @@ impl SerializableDict for TextDict {
                         dupkey
                     )));
                 }
-                Ok(Rc::new(TextDict::from_lexicon(lexicon)))
+                Ok(Arc::new(TextDict::from_lexicon(Arc::new(lexicon))))
             }
             Err(e) => Err(e),
         }

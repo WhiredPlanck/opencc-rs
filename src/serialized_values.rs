@@ -2,14 +2,13 @@ use std::{
     ffi::CString,
     fs::File,
     io::{Read, Write},
-    ptr,
-    rc::Rc,
+    ptr, sync::Arc,
 };
 
 use crate::{Dict, DictEntry, Error, Lexicon, SerializableDict};
 
 pub struct SerializedValues {
-    lexicon: Rc<Lexicon>,
+    lexicon: Arc<Lexicon>,
 }
 
 fn read_integer<I: Default + Copy + Sized, R: Read>(reader: &mut R) -> Result<I, Error> {
@@ -41,7 +40,7 @@ where
 }
 
 impl SerializedValues {
-    pub fn from_lexicon(lexicon: Rc<Lexicon>) -> Self {
+    pub fn from_lexicon(lexicon: Arc<Lexicon>) -> Self {
         Self { lexicon }
     }
 
@@ -93,7 +92,7 @@ impl Dict for SerializedValues {
         0
     }
 
-    fn lexicon(&self) -> Rc<Lexicon> {
+    fn lexicon(&self) -> Arc<Lexicon> {
         self.lexicon.clone()
     }
 
@@ -103,7 +102,7 @@ impl Dict for SerializedValues {
 }
 
 impl SerializableDict for SerializedValues {
-    fn new_from_file(file: &mut File) -> Result<Rc<dyn Dict>, crate::Error> {
+    fn new_from_file(file: &mut File) -> Result<Arc<dyn Dict>, crate::Error> {
         let mut entries = Vec::new();
         let num_items: u32 = read_integer(file)?;
         let value_total_length: u32 = read_integer(file)?;
@@ -130,7 +129,7 @@ impl SerializableDict for SerializedValues {
             let entry = DictEntry::new_with_key_and_values("", values);
             entries.push(entry);
         }
-        Ok(Rc::new(Self { lexicon: Rc::new(Lexicon::from_entries(entries))} ))
+        Ok(Arc::new(Self { lexicon: Arc::new(Lexicon::from_entries(entries))} ))
     }
 
     fn serialize_to_file(&self, file: &mut File) -> Result<(), Error> {

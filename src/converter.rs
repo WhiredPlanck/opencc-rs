@@ -1,19 +1,18 @@
 use std::path::Path;
-use std::rc::Rc;
 
 use crate::{Config, ConversionChain, Error, Segmentation};
 
 pub struct Converter {
     _name: String,
     segmentation: Segmentation,
-    conversion_chain: Rc<ConversionChain>
+    conversion_chain: ConversionChain
 }
 
 impl Converter {
     pub fn new(
         name: &str,
         segmentation: Segmentation,
-        conversion_chain: Rc<ConversionChain>
+        conversion_chain: ConversionChain
     ) -> Self {
         Self { _name: name.to_string(), segmentation, conversion_chain }
     }

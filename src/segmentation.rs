@@ -1,17 +1,17 @@
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::{Dict, PrefixMatch};
 
 pub enum Segmentation {
-    MaxMatch { dict: Rc<dyn Dict>, prefix_match: PrefixMatch },
+    MaxMatch { dict: Arc<dyn Dict>, prefix_match: PrefixMatch },
 }
 
 impl Segmentation {
-    pub fn new(dict: Rc<dyn Dict>) -> Self {
+    pub fn new(dict: Arc<dyn Dict>) -> Self {
         Self::MaxMatch { dict: dict.clone(), prefix_match: PrefixMatch::from_dict(&dict) }
     }
 
-    pub fn dict(&self) -> Rc<dyn Dict> {
+    pub fn dict(&self) -> Arc<dyn Dict> {
         match self {
             Segmentation::MaxMatch { dict, .. } => dict.clone(),
         }

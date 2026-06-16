@@ -1,4 +1,4 @@
-use std::{cell::{Ref, RefCell}, io::{BufRead, BufReader, Read}, rc::Rc};
+use std::io::{BufRead, BufReader, Read};
 
 use crate::{DictEntry, Error};
 
@@ -20,32 +20,32 @@ fn parse_key_values(buff: &str, line_num: usize) -> Result<DictEntry, Error> {
 }
 
 pub struct Lexicon {
-    entries: RefCell<Vec<DictEntry>>
+    entries: Vec<DictEntry>
 }
 
 impl Lexicon {
     pub fn new() -> Self {
-        Self { entries: RefCell::new(Vec::new()) }
+        Self { entries: Vec::new() }
     }
 
     pub fn from_entries(entries: Vec<DictEntry>) -> Self {
-        Self { entries: RefCell::new(entries) }
+        Self { entries }
     }
 
-    pub fn add(&self, entry: DictEntry) {
-        self.entries.borrow_mut().push(entry);
+    pub fn add(&mut self, entry: DictEntry) {
+        self.entries.push(entry);
     }
 
-    pub fn sort(&self) {
-        self.entries.borrow_mut().sort();
+    pub fn sort(&mut self) {
+        self.entries.sort();
     }
 
     pub fn is_sorted(&self) -> bool {
-        self.entries.borrow().is_sorted_by(|a, b| a.key() < b.key())
+        self.entries.is_sorted_by(|a, b| a.key() < b.key())
     }
 
     pub fn is_unique(&self, dupkey: Option<&mut String>) -> bool {
-        let entries = self.entries.borrow();
+        let entries = &self.entries;
         for i in 1..entries.len() - 1 {
             if entries[i - 1].key() == entries[i].key() {
                 if let Some(dupkey) = dupkey {
@@ -57,26 +57,26 @@ impl Lexicon {
         true
     }
 
-    pub fn get(&self, index: usize) -> Ref<'_, DictEntry> {
-        Ref::map(self.entries.borrow(), |vec| &vec[index])
+    pub fn get(&self, index: usize) -> &DictEntry {
+        &self.entries[index]
     }
 
     pub fn len(&self) -> usize {
-        self.entries.borrow().len()
+        self.entries.len()
     }
 
-    pub fn iter(&self) -> LexiconIter<'_> {
-        self.into_iter()
+    pub fn iter(&self) -> std::slice::Iter<'_, DictEntry> {
+        self.entries.iter()
     }
 
     pub fn partition_point<P>(&self, pred: P)-> usize
     where
         P: FnMut(&DictEntry) -> bool,
     {
-        self.entries.borrow().partition_point(pred)
+        self.entries.partition_point(pred)
     }
 
-    pub fn parse_lexicon_from<R: Read>(reader: R) -> Result<Rc<Lexicon>, Error> {
+    pub fn parse_lexicon_from<R: Read>(reader: R) -> Result<Lexicon, Error> {
         let mut entries = Vec::new();
         let reader = BufReader::new(reader);
         for (i, line) in reader.lines().enumerate() {
@@ -86,51 +86,12 @@ impl Lexicon {
                 Err(e) => return Err(e)
             }
         }
-        Ok(Rc::new(Lexicon::from_entries(entries)))
-    }
-}
-
-pub struct LexiconIter<'a> {
-    borrow: Ref<'a, Vec<DictEntry>>,
-    index: usize
-}
-
-impl<'a> LexiconIter<'a> {
-    fn new(borrow: Ref<'a, Vec<DictEntry>>) -> Self {
-        Self { borrow, index: 0 }
-    }
-}
-
-impl<'a> Iterator for LexiconIter<'a> {
-    type Item = Ref<'a, DictEntry>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.index < self.borrow.len() {
-            let e = Ref::map(Ref::clone(&self.borrow), |vec| &vec[self.index]);
-            self.index += 1;
-            Some(e)
-        } else {
-            None
-        }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let remaining = self.borrow.len() - self.index;
-        (remaining, Some(remaining))
-    }
-}
-
-impl<'a> IntoIterator for &'a Lexicon {
-    type Item = Ref<'a, DictEntry>;
-    type IntoIter = LexiconIter<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        LexiconIter::new(self.entries.borrow())
+        Ok(Lexicon::from_entries(entries))
     }
 }
 
 impl FromIterator<DictEntry> for Lexicon {
     fn from_iter<T: IntoIterator<Item = DictEntry>>(iter: T) -> Self {
-        Self { entries: RefCell::new(Vec::from_iter(iter)) }
+        Self { entries: Vec::from_iter(iter) }
     }
 }

@@ -1,4 +1,6 @@
-use std::{cell::RefCell, collections::HashMap, rc::{Rc, Weak}};
+use std::{cell::RefCell, collections::HashMap, sync::{Arc, RwLock, Weak}};
+
+use once_cell::sync::OnceCell;
 
 use crate::Dict;
 
@@ -29,7 +31,7 @@ struct Table {
 }
 
 impl Table {
-    fn from_dict(dict: &Rc<dyn Dict>) -> Self {
+    fn from_dict(dict: &Arc<dyn Dict>) -> Self {
         let lexicon = dict.lexicon();
         let mut table = Table::default();
         for entry in lexicon.iter() {
@@ -83,7 +85,7 @@ pub struct MatchResult {
 }
 
 pub struct PrefixMatch {
-    tables: Rc<Tables>
+    tables: Arc<Tables>
 }
 
 thread_local! {
@@ -108,53 +110,50 @@ fn prune_expired_prefix_match_cache(cache: &mut HashMap<String, Vec<CacheEntry>>
 }
 
 impl PrefixMatch {
-    pub fn from_dict(dict: &Rc<dyn Dict>) -> Self {
+    pub fn from_dict(dict: &Arc<dyn Dict>) -> Self {
+        static CACHE: OnceCell<RwLock<HashMap<String, Vec<CacheEntry>>>> = OnceCell::new();
+        let lock = CACHE.get_or_init(|| RwLock::new(HashMap::new()));
+
         let mut cache_key = String::new();
         Self::append_cache_key(dict, &mut cache_key);
         let mut leave_dicts = Vec::new();
         Self::collect_leaf_dicts(dict, &mut leave_dicts);
 
         // try get cached tables
-        let tables = CACHE.with_borrow_mut(|cache| {
-            prune_expired_prefix_match_cache(cache);
+        {
+            let mut cache = lock.write().unwrap();
+            prune_expired_prefix_match_cache(&mut cache);
             let cached = cache.entry(cache_key.clone()).or_default();
             for entry in cached {
                 if same_dicts(&entry.dicts, &leave_dicts) {
                     if let Some(tables) = entry.tables.upgrade() {
-                        return Some(tables);
+                        return Self { tables };
                     }
                 }
             }
-            None
-        });
-        if let Some(tables) = tables {
-            return Self { tables };
         }
 
         let mut tables = Tables::new();
         Self::add_dict(&dict, &mut tables);
-        let built_tables = Rc::new(tables);
+        let built = Arc::new(tables);
 
-        let built = CACHE.with_borrow_mut(|cache| {
-            prune_expired_prefix_match_cache(cache);
-            let entries = cache.entry(cache_key).or_default();
-            entries.retain(|entry| {
-                !entry.has_expired_dict() || 
-                (same_dicts(&entry.dicts, &leave_dicts) 
-                    && entry.tables.upgrade().is_none())
-            });
-            for entry in entries.iter() {
-                if let Some(tables) = entry.tables.upgrade() {
-                    return tables
-                }
-            }
-            entries.push(CacheEntry {
-                dicts: leave_dicts,
-                tables: Rc::downgrade(&built_tables)
-            });
-            built_tables
+        let mut cache = lock.write().unwrap();
+        prune_expired_prefix_match_cache(&mut cache);
+        let entries = cache.entry(cache_key).or_default();
+        entries.retain(|entry| {
+            !entry.has_expired_dict() || 
+            (same_dicts(&entry.dicts, &leave_dicts) 
+                && entry.tables.upgrade().is_none())
         });
-        
+        for entry in entries.iter() {
+            if let Some(tables) = entry.tables.upgrade() {
+                return Self { tables }
+            }
+        }
+        entries.push(CacheEntry {
+            dicts: leave_dicts,
+            tables: Arc::downgrade(&built)
+        });
         Self { tables: built }
     }
 
@@ -162,7 +161,7 @@ impl PrefixMatch {
         self.tables.tables.iter().find_map(|table| table.match_prefix(word))
     }
 
-    fn add_dict(dict: &Rc<dyn Dict>, output: &mut Tables) {
+    fn add_dict(dict: &Arc<dyn Dict>, output: &mut Tables) {
         if let Some(dict_group_items) = dict.dict_group_items() {
             for child in dict_group_items {
                 Self::add_dict(child, output);
@@ -172,7 +171,7 @@ impl PrefixMatch {
         }
     }
 
-    fn append_cache_key(dict: &Rc<dyn Dict>, output: &mut String) {
+    fn append_cache_key(dict: &Arc<dyn Dict>, output: &mut String) {
         if let Some(dict_group_items) = dict.dict_group_items() {
             output.push('[');
             for child in dict_group_items {
@@ -186,13 +185,13 @@ impl PrefixMatch {
         }
     }
 
-    fn collect_leaf_dicts(dict: &Rc<dyn Dict>, out: &mut Vec<Weak<dyn Dict>>) {
+    fn collect_leaf_dicts(dict: &Arc<dyn Dict>, out: &mut Vec<Weak<dyn Dict>>) {
         if let Some(children) = dict.dict_group_items() {
             for child in children {
                 Self::collect_leaf_dicts(child, out);
             }
         } else {
-            out.push(Rc::downgrade(&dict));
+            out.push(Arc::downgrade(&dict));
         }
     }
 }

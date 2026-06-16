@@ -1,10 +1,8 @@
 use std::{
-    cell::Ref,
     cmp::{max, min},
     collections::HashMap,
     fs::File,
-    io::{Read, Write},
-    rc::Rc,
+    io::{Read, Write}, sync::Arc,
 };
 
 use rsmarisa::{
@@ -20,12 +18,12 @@ static OCD2_HEADER: &str = "OPENCC_MARISA_0.2.5";
 
 pub struct MarisaDict {
     max_length: usize,
-    lexicon: Rc<Lexicon>,
+    lexicon: Arc<Lexicon>,
     marisa: Trie,
 }
 
 impl MarisaDict {
-    pub fn from_dict(dict: &dyn Dict) -> Rc<Self> {
+    pub fn from_dict(dict: &dyn Dict) -> Self {
         let that_lexicon = &dict.lexicon();
         let mut max_key_length = 0;
         let mut keyset = Keyset::new();
@@ -50,12 +48,12 @@ impl MarisaDict {
                 entries[agent.key().id()] = entry;
             }
         }
-        let lexicon = Rc::new(Lexicon::from_entries(entries));
-        Rc::new(Self {
+        let lexicon = Arc::new(Lexicon::from_entries(entries));
+        Self {
             max_length: max_key_length,
             lexicon,
             marisa,
-        })
+        }
     }
 }
 
@@ -64,7 +62,7 @@ impl Dict for MarisaDict {
         self.max_length
     }
 
-    fn lexicon(&self) -> Rc<Lexicon> {
+    fn lexicon(&self) -> Arc<Lexicon> {
         self.lexicon.clone()
     }
 
@@ -72,7 +70,7 @@ impl Dict for MarisaDict {
         self as *const Self as usize
     }
 
-    fn match_word(&self, word: &str) -> Option<Ref<'_, DictEntry>> {
+    fn match_word(&self, word: &str) -> Option<&DictEntry> {
         if word.len() > self.max_length {
             return None;
         }
@@ -86,7 +84,7 @@ impl Dict for MarisaDict {
         }
     }
 
-    fn match_prefix(&self, word: &str) -> Option<Ref<'_, DictEntry>> {
+    fn match_prefix(&self, word: &str) -> Option<&DictEntry> {
         let mut agent = Agent::new();
         agent.set_query_str(&word[..min(self.max_length, word.len())]);
         let mut matched = None;
@@ -96,7 +94,7 @@ impl Dict for MarisaDict {
         matched
     }
 
-    fn match_all_prefix(&self, word: &str) -> Vec<Ref<'_, DictEntry>> {
+    fn match_all_prefix(&self, word: &str) -> Vec<&DictEntry> {
         let mut agent = Agent::new();
         agent.set_query_str(&word[..min(self.max_length, word.len())]);
         let mut matches = Vec::new();
@@ -110,7 +108,7 @@ impl Dict for MarisaDict {
 }
 
 impl SerializableDict for MarisaDict {
-    fn new_from_file(file: &mut File) -> Result<Rc<dyn Dict>, Error> {
+    fn new_from_file(file: &mut File) -> Result<Arc<dyn Dict>, Error> {
         let header_len: usize = OCD2_HEADER.len();
         let mut buffer = vec![0u8; header_len];
         if file.read_exact(&mut buffer).is_err() || str::from_utf8(&buffer)? != OCD2_HEADER
@@ -139,8 +137,8 @@ impl SerializableDict for MarisaDict {
             // Don't use `insert` here, it's slow
             entries[id] = entry;
         }
-        let lexicon = Rc::new(Lexicon::from_entries(entries));
-        Ok(Rc::new(Self {
+        let lexicon = Arc::new(Lexicon::from_entries(entries));
+        Ok(Arc::new(Self {
             max_length,
             lexicon,
             marisa,
