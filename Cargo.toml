@@ -17,6 +17,7 @@ path = "src/tools/dict_converter.rs"
 required-features = ["tools"]
 
 [dependencies]
+dashmap = "6.2.1"
 enum_dispatch = "^0.3"
 libc = "0.2"
 rsmarisa = "0.4.2"

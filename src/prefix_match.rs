@@ -1,5 +1,6 @@
-use std::{cell::RefCell, collections::HashMap, sync::{Arc, RwLock, Weak}};
+use std::{collections::HashMap, sync::{Arc, Weak}};
 
+use dashmap::DashMap;
 use once_cell::sync::OnceCell;
 
 use crate::{AnyDict, Dict};
@@ -88,10 +89,6 @@ pub struct PrefixMatch {
     tables: Arc<Tables>
 }
 
-thread_local! {
-    static CACHE: RefCell<HashMap<String, Vec<CacheEntry>>> = RefCell::new(HashMap::new());
-}
-
 fn same_dicts(cached: &[Weak<AnyDict>], current: &[Weak<AnyDict>]) -> bool {
     if cached.len() != current.len() {
         return false;
@@ -102,7 +99,7 @@ fn same_dicts(cached: &[Weak<AnyDict>], current: &[Weak<AnyDict>]) -> bool {
     })
 }
 
-fn prune_expired_prefix_match_cache(cache: &mut HashMap<String, Vec<CacheEntry>>) {
+fn prune_expired_prefix_match_cache(cache: &DashMap<String, Vec<CacheEntry>>) {
     cache.retain(|_, entries| {
         entries.retain(|entry| !entry.has_expired_dict());
         !entries.is_empty()
@@ -111,8 +108,8 @@ fn prune_expired_prefix_match_cache(cache: &mut HashMap<String, Vec<CacheEntry>>
 
 impl PrefixMatch {
     pub fn from_dict(dict: &Arc<AnyDict>) -> Self {
-        static CACHE: OnceCell<RwLock<HashMap<String, Vec<CacheEntry>>>> = OnceCell::new();
-        let lock = CACHE.get_or_init(|| RwLock::new(HashMap::new()));
+        static CACHE: OnceCell<DashMap<String, Vec<CacheEntry>>> = OnceCell::new();
+        let cache = CACHE.get_or_init(|| DashMap::new());
 
         let mut cache_key = String::new();
         Self::append_cache_key(dict, &mut cache_key);
@@ -121,10 +118,9 @@ impl PrefixMatch {
 
         // try get cached tables
         {
-            let mut cache = lock.write().unwrap();
-            prune_expired_prefix_match_cache(&mut cache);
+            prune_expired_prefix_match_cache(&cache);
             let cached = cache.entry(cache_key.clone()).or_default();
-            for entry in cached {
+            for entry in cached.iter() {
                 if same_dicts(&entry.dicts, &leave_dicts) {
                     if let Some(tables) = entry.tables.upgrade() {
                         return Self { tables };
@@ -137,9 +133,8 @@ impl PrefixMatch {
         Self::add_dict(&dict, &mut tables);
         let built = Arc::new(tables);
 
-        let mut cache = lock.write().unwrap();
-        prune_expired_prefix_match_cache(&mut cache);
-        let entries = cache.entry(cache_key).or_default();
+        prune_expired_prefix_match_cache(&cache);
+        let mut entries = cache.entry(cache_key).or_default();
         entries.retain(|entry| {
             !entry.has_expired_dict() || 
             (same_dicts(&entry.dicts, &leave_dicts) 

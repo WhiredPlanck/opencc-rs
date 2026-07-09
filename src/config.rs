@@ -1,7 +1,8 @@
 use std::{
-    collections::HashMap, fs, io, path::{Path, PathBuf}, sync::{Arc, RwLock, Weak}, time::UNIX_EPOCH
+    fs, io, path::{Path, PathBuf}, sync::{Arc, Weak}, time::UNIX_EPOCH
 };
 
+use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 
@@ -9,12 +10,11 @@ use crate::{
     AnyDict, Conversion, ConversionChain, Converter, DictGroup, Error, MarisaDict, Segmentation, SerializableDict, TextDict
 };
 
-static DICT_CACHE: Lazy<RwLock<HashMap<String, Weak<AnyDict>>>> =
-    Lazy::new(|| RwLock::new(HashMap::new()));
+static DICT_CACHE: Lazy<DashMap<String, Weak<AnyDict>>> =
+    Lazy::new(|| DashMap::new());
 
 fn prune_expired_dict_cache() {
-    let mut cache = DICT_CACHE.write().unwrap();
-    cache.retain(|_, dict| dict.upgrade().is_some());
+    DICT_CACHE.retain(|_, dict| dict.upgrade().is_some());
 }
 
 fn get_file_cache_key(path: &Path, cache_prefix: &str) -> io::Result<String> {
@@ -141,8 +141,7 @@ impl Config {
             let cache_key = cache_key.unwrap();
             {
                 prune_expired_dict_cache();
-                let cache = DICT_CACHE.read().unwrap();
-                if let Some(cached) = cache.get(&cache_key) {
+                if let Some(cached) = DICT_CACHE.get(&cache_key) {
                     if let Some(dict) = cached.upgrade() {
                         return Ok(dict);
                     }
@@ -152,13 +151,12 @@ impl Config {
             if let Ok(dict) = D::new_from_path(filename.as_ref()) {
                 prune_expired_dict_cache();
                 {
-                    let cache = DICT_CACHE.read().unwrap();
-                    if let Some(cached_dict) = cache.get(&cache_key).and_then(Weak::upgrade) {
+                    if let Some(cached_dict) = DICT_CACHE.get(&cache_key)
+                        .and_then(|entry| entry.upgrade()) {
                         return Ok(cached_dict);
                     }
                 }
-                let mut cache = DICT_CACHE.write().unwrap();
-                cache.insert(cache_key, Arc::downgrade(&dict));
+                DICT_CACHE.insert(cache_key, Arc::downgrade(&dict));
                 return Ok(dict);
             }
         }
