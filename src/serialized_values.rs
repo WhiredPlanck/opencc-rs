@@ -102,7 +102,7 @@ impl Dict for SerializedValues {
 }
 
 impl SerializableDict for SerializedValues {
-    fn new_from_file(file: &mut File) -> Result<Arc<AnyDict>, crate::Error> {
+    fn new_from_file(file: &mut File) -> Result<AnyDict, crate::Error> {
         let mut entries = Vec::new();
         let num_items: u32 = read_integer(file)?;
         let value_total_length: u32 = read_integer(file)?;
@@ -129,7 +129,7 @@ impl SerializableDict for SerializedValues {
             let entry = DictEntry::new_with_key_and_values("", values);
             entries.push(entry);
         }
-        Ok(Arc::new(AnyDict::Serialized(Self { lexicon: Arc::new(Lexicon::from_entries(entries))}) ))
+        Ok(AnyDict::Serialized(Self { lexicon: Arc::new(Lexicon::from_entries(entries))}))
     }
 
     fn serialize_to_file(&self, file: &mut File) -> Result<(), Error> {

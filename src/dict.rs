@@ -56,9 +56,9 @@ pub trait SerializableDict {
         self.serialize_to_file(&mut file)
     }
 
-    fn new_from_file(file: &mut File) -> Result<Arc<AnyDict>, Error> where Self: Sized;
+    fn new_from_file(file: &mut File) -> Result<AnyDict, Error> where Self: Sized;
 
-    fn new_from_path(path: &Path) -> Result<Arc<AnyDict>, Error> where Self: Sized {
+    fn new_from_path(path: &Path) -> Result<AnyDict, Error> where Self: Sized {
         let mut file = File::open(path)?;
         Self::new_from_file(&mut file)
     }

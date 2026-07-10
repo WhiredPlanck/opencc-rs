@@ -156,6 +156,7 @@ impl Config {
                         return Ok(cached_dict);
                     }
                 }
+                let dict = Arc::new(dict);
                 DICT_CACHE.insert(cache_key, Arc::downgrade(&dict));
                 return Ok(dict);
             }

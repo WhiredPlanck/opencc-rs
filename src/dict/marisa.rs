@@ -108,7 +108,7 @@ impl Dict for MarisaDict {
 }
 
 impl SerializableDict for MarisaDict {
-    fn new_from_file(file: &mut File) -> Result<Arc<AnyDict>, Error> {
+    fn new_from_file(file: &mut File) -> Result<AnyDict, Error> {
         let header_len: usize = OCD2_HEADER.len();
         let mut buffer = vec![0u8; header_len];
         if file.read_exact(&mut buffer).is_err() || str::from_utf8(&buffer)? != OCD2_HEADER
@@ -142,7 +142,7 @@ impl SerializableDict for MarisaDict {
             max_length,
             lexicon,
             marisa,
-        }).into())
+        }))
     }
 
     fn serialize_to_file(&self, file: &mut File) -> Result<(), Error> {

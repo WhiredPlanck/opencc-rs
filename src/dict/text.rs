@@ -60,7 +60,7 @@ impl Dict for TextDict {
 }
 
 impl SerializableDict for TextDict {
-    fn new_from_file(file: &mut File) -> Result<Arc<AnyDict>, Error> {
+    fn new_from_file(file: &mut File) -> Result<AnyDict, Error> {
         match Lexicon::parse_lexicon_from(file) {
             Ok(mut lexicon) => {
                 lexicon.sort();
@@ -71,7 +71,7 @@ impl SerializableDict for TextDict {
                         dupkey
                     )));
                 }
-                Ok(AnyDict::Text(TextDict::from_lexicon(Arc::new(lexicon))).into())
+                Ok(AnyDict::Text(TextDict::from_lexicon(Arc::new(lexicon))))
             }
             Err(e) => Err(e),
         }
