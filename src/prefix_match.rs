@@ -2,10 +2,10 @@ use std::{cell::RefCell, collections::HashMap, sync::{Arc, RwLock, Weak}};
 
 use once_cell::sync::OnceCell;
 
-use crate::Dict;
+use crate::{AnyDict, Dict};
 
 struct CacheEntry {
-    dicts: Vec<Weak<dyn Dict>>,
+    dicts: Vec<Weak<AnyDict>>,
     tables: Weak<Tables>
 }
 
@@ -31,7 +31,7 @@ struct Table {
 }
 
 impl Table {
-    fn from_dict(dict: &Arc<dyn Dict>) -> Self {
+    fn from_dict(dict: &Arc<AnyDict>) -> Self {
         let lexicon = dict.lexicon();
         let mut table = Table::default();
         for entry in lexicon.iter() {
@@ -92,7 +92,7 @@ thread_local! {
     static CACHE: RefCell<HashMap<String, Vec<CacheEntry>>> = RefCell::new(HashMap::new());
 }
 
-fn same_dicts(cached: &[Weak<dyn Dict>], current: &[Weak<dyn Dict>]) -> bool {
+fn same_dicts(cached: &[Weak<AnyDict>], current: &[Weak<AnyDict>]) -> bool {
     if cached.len() != current.len() {
         return false;
     }
@@ -110,7 +110,7 @@ fn prune_expired_prefix_match_cache(cache: &mut HashMap<String, Vec<CacheEntry>>
 }
 
 impl PrefixMatch {
-    pub fn from_dict(dict: &Arc<dyn Dict>) -> Self {
+    pub fn from_dict(dict: &Arc<AnyDict>) -> Self {
         static CACHE: OnceCell<RwLock<HashMap<String, Vec<CacheEntry>>>> = OnceCell::new();
         let lock = CACHE.get_or_init(|| RwLock::new(HashMap::new()));
 
@@ -161,7 +161,7 @@ impl PrefixMatch {
         self.tables.tables.iter().find_map(|table| table.match_prefix(word))
     }
 
-    fn add_dict(dict: &Arc<dyn Dict>, output: &mut Tables) {
+    fn add_dict(dict: &Arc<AnyDict>, output: &mut Tables) {
         if let Some(dict_group_items) = dict.dict_group_items() {
             for child in dict_group_items {
                 Self::add_dict(child, output);
@@ -171,7 +171,7 @@ impl PrefixMatch {
         }
     }
 
-    fn append_cache_key(dict: &Arc<dyn Dict>, output: &mut String) {
+    fn append_cache_key(dict: &Arc<AnyDict>, output: &mut String) {
         if let Some(dict_group_items) = dict.dict_group_items() {
             output.push('[');
             for child in dict_group_items {
@@ -185,7 +185,7 @@ impl PrefixMatch {
         }
     }
 
-    fn collect_leaf_dicts(dict: &Arc<dyn Dict>, out: &mut Vec<Weak<dyn Dict>>) {
+    fn collect_leaf_dicts(dict: &Arc<AnyDict>, out: &mut Vec<Weak<AnyDict>>) {
         if let Some(children) = dict.dict_group_items() {
             for child in children {
                 Self::collect_leaf_dicts(child, out);

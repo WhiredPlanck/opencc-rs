@@ -2,7 +2,7 @@ use std::{
     cmp::max, fs::File, io::{Read, Write}, sync::Arc
 };
 
-use crate::{Dict, DictEntry, Error, Lexicon, SerializableDict};
+use crate::{AnyDict, Dict, DictEntry, Error, Lexicon, SerializableDict};
 
 pub struct TextDict {
     max_length: usize,
@@ -29,7 +29,7 @@ impl TextDict {
         }
     }
 
-    pub fn from_dict(dict: &dyn Dict) -> Self {
+    pub fn from_dict(dict: &AnyDict) -> Self {
         TextDict::from_lexicon(dict.lexicon())
     }
 }
@@ -60,7 +60,7 @@ impl Dict for TextDict {
 }
 
 impl SerializableDict for TextDict {
-    fn new_from_file(file: &mut File) -> Result<Arc<dyn Dict>, Error> {
+    fn new_from_file(file: &mut File) -> Result<Arc<AnyDict>, Error> {
         match Lexicon::parse_lexicon_from(file) {
             Ok(mut lexicon) => {
                 lexicon.sort();
@@ -71,7 +71,7 @@ impl SerializableDict for TextDict {
                         dupkey
                     )));
                 }
-                Ok(Arc::new(TextDict::from_lexicon(Arc::new(lexicon))))
+                Ok(AnyDict::Text(TextDict::from_lexicon(Arc::new(lexicon))).into())
             }
             Err(e) => Err(e),
         }

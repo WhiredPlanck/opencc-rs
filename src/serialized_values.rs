@@ -5,7 +5,7 @@ use std::{
     ptr, sync::Arc,
 };
 
-use crate::{Dict, DictEntry, Error, Lexicon, SerializableDict};
+use crate::{AnyDict, Dict, DictEntry, Error, Lexicon, SerializableDict};
 
 pub struct SerializedValues {
     lexicon: Arc<Lexicon>,
@@ -102,7 +102,7 @@ impl Dict for SerializedValues {
 }
 
 impl SerializableDict for SerializedValues {
-    fn new_from_file(file: &mut File) -> Result<Arc<dyn Dict>, crate::Error> {
+    fn new_from_file(file: &mut File) -> Result<Arc<AnyDict>, crate::Error> {
         let mut entries = Vec::new();
         let num_items: u32 = read_integer(file)?;
         let value_total_length: u32 = read_integer(file)?;
@@ -129,7 +129,7 @@ impl SerializableDict for SerializedValues {
             let entry = DictEntry::new_with_key_and_values("", values);
             entries.push(entry);
         }
-        Ok(Arc::new(Self { lexicon: Arc::new(Lexicon::from_entries(entries))} ))
+        Ok(Arc::new(AnyDict::Serialized(Self { lexicon: Arc::new(Lexicon::from_entries(entries))}) ))
     }
 
     fn serialize_to_file(&self, file: &mut File) -> Result<(), Error> {

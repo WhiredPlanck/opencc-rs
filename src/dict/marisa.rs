@@ -11,7 +11,7 @@ use rsmarisa::{
 };
 
 use crate::{
-    Dict, DictEntry, Error, Lexicon, SerializableDict, SerializedValues
+    AnyDict, Dict, DictEntry, Error, Lexicon, SerializableDict, SerializedValues
 };
 
 static OCD2_HEADER: &str = "OPENCC_MARISA_0.2.5";
@@ -23,7 +23,7 @@ pub struct MarisaDict {
 }
 
 impl MarisaDict {
-    pub fn from_dict(dict: &dyn Dict) -> Self {
+    pub fn from_dict(dict: &AnyDict) -> Self {
         let that_lexicon = &dict.lexicon();
         let mut max_key_length = 0;
         let mut keyset = Keyset::new();
@@ -108,7 +108,7 @@ impl Dict for MarisaDict {
 }
 
 impl SerializableDict for MarisaDict {
-    fn new_from_file(file: &mut File) -> Result<Arc<dyn Dict>, Error> {
+    fn new_from_file(file: &mut File) -> Result<Arc<AnyDict>, Error> {
         let header_len: usize = OCD2_HEADER.len();
         let mut buffer = vec![0u8; header_len];
         if file.read_exact(&mut buffer).is_err() || str::from_utf8(&buffer)? != OCD2_HEADER
@@ -138,11 +138,11 @@ impl SerializableDict for MarisaDict {
             entries[id] = entry;
         }
         let lexicon = Arc::new(Lexicon::from_entries(entries));
-        Ok(Arc::new(Self {
+        Ok(AnyDict::Marisa(Self {
             max_length,
             lexicon,
             marisa,
-        }))
+        }).into())
     }
 
     fn serialize_to_file(&self, file: &mut File) -> Result<(), Error> {

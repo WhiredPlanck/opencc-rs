@@ -1,17 +1,28 @@
 use std::{cmp::min, fs::File, path::Path, sync::Arc};
 
-use crate::{DictEntry, Error, Lexicon};
+use enum_dispatch::enum_dispatch;
+
+use crate::{DictEntry, DictGroup, Error, Lexicon, MarisaDict, SerializedValues, TextDict};
 
 pub mod group;
 pub mod text;
 pub mod marisa;
 
+#[enum_dispatch(Dict)]
+pub enum AnyDict {
+    Group(DictGroup),
+    Marisa(MarisaDict),
+    Text(TextDict),
+    Serialized(SerializedValues)
+}
+
+#[enum_dispatch]
 pub trait Dict: Send + Sync {
     fn key_max_length(&self) -> usize;
 
     fn lexicon(&self) -> Arc<Lexicon>;
 
-    fn dict_group_items(&self) -> Option<&Vec<Arc<dyn Dict>>> {
+    fn dict_group_items(&self) -> Option<&Vec<Arc<AnyDict>>> {
         None
     }
 
@@ -45,9 +56,9 @@ pub trait SerializableDict {
         self.serialize_to_file(&mut file)
     }
 
-    fn new_from_file(file: &mut File) -> Result<Arc<dyn Dict>, Error> where Self: Sized;
+    fn new_from_file(file: &mut File) -> Result<Arc<AnyDict>, Error> where Self: Sized;
 
-    fn new_from_path(path: &Path) -> Result<Arc<dyn Dict>, Error> where Self: Sized {
+    fn new_from_path(path: &Path) -> Result<Arc<AnyDict>, Error> where Self: Sized {
         let mut file = File::open(path)?;
         Self::new_from_file(&mut file)
     }

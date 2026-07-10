@@ -1,14 +1,14 @@
 use std::{cmp::max, collections::BTreeMap, sync::Arc};
 
-use crate::{Dict, DictEntry, Lexicon};
+use crate::{AnyDict, Dict, DictEntry, Lexicon};
 
 pub struct DictGroup {
     key_max_length: usize,
-    dicts: Vec<Arc<dyn Dict>>
+    dicts: Vec<Arc<AnyDict>>
 }
 
 impl DictGroup {
-    pub fn new(dicts: Vec<Arc<dyn Dict>>) -> Self {
+    pub fn new(dicts: Vec<Arc<AnyDict>>) -> Self {
         let key_max_length = dicts.iter()
             .fold(0, |acc, e| {
                 max(acc, e.key_max_length())
@@ -16,7 +16,7 @@ impl DictGroup {
         Self { key_max_length, dicts }
     }
 
-    pub fn dicts(&self) -> &Vec<Arc<dyn Dict>> {
+    pub fn dicts(&self) -> &Vec<Arc<AnyDict>> {
         &self.dicts
     }
 }
@@ -40,7 +40,7 @@ impl Dict for DictGroup {
         Arc::new(all_lexicon)
     }
 
-    fn dict_group_items(&self) -> Option<&Vec<Arc<dyn Dict>>> {
+    fn dict_group_items(&self) -> Option<&Vec<Arc<AnyDict>>> {
         Some(&self.dicts)
     }
 

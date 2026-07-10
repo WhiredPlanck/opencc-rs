@@ -6,10 +6,10 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 
 use crate::{
-    Conversion, ConversionChain, Converter, Dict, DictGroup, Error, MarisaDict, Segmentation, SerializableDict, TextDict
+    AnyDict, Conversion, ConversionChain, Converter, DictGroup, Error, MarisaDict, Segmentation, SerializableDict, TextDict
 };
 
-static DICT_CACHE: Lazy<RwLock<HashMap<String, Weak<dyn Dict>>>> =
+static DICT_CACHE: Lazy<RwLock<HashMap<String, Weak<AnyDict>>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
 fn prune_expired_dict_cache() {
@@ -126,7 +126,7 @@ impl Config {
         &self,
         cache_prefix: &str,
         filename: &str
-    ) -> Result<Arc<dyn Dict>, Error> {
+    ) -> Result<Arc<AnyDict>, Error> {
         let mut candidates = vec![PathBuf::from(filename)];
         for dir_path in &self.paths {
             let path = dir_path.join(filename);
@@ -165,7 +165,7 @@ impl Config {
         Err(Error::FileNotFound(filename.to_string()))
     }
 
-    fn parse_dict(&self, config: &DictKind) -> Result<Arc<dyn Dict>, Error> {
+    fn parse_dict(&self, config: &DictKind) -> Result<Arc<AnyDict>, Error> {
         match config {
             DictKind::Group(group) => {
                 let mut dicts = Vec::new();
@@ -173,11 +173,11 @@ impl Config {
                     let dict = self.parse_dict(kind)?;
                     dicts.push(dict);
                 }
-                Ok(Arc::new(DictGroup::new(dicts)))
+                Ok(Arc::new(DictGroup::new(dicts).into()))
             }
             DictKind::Text(dict) => {
                 let dict = self.load_dict_with_paths::<TextDict>("text", &dict.file)?;
-                Ok(Arc::new(MarisaDict::from_dict(dict.as_ref())))
+                Ok(Arc::new(MarisaDict::from_dict(dict.as_ref()).into()))
             }
             DictKind::Ocd2(dict) => {
                 let dict = self.load_dict_with_paths::<MarisaDict>("ocd2", &dict.file)?;

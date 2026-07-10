@@ -1,18 +1,18 @@
 use std::sync::Arc;
 
-use crate::{Dict, PrefixMatch};
+use crate::{AnyDict, PrefixMatch};
 
 pub struct Conversion {
-    dict: Arc<dyn Dict>,
+    dict: Arc<AnyDict>,
     prefix_match: PrefixMatch
 }
 
 impl Conversion {
-    pub fn new(dict: Arc<dyn Dict>) -> Self {
+    pub fn new(dict: Arc<AnyDict>) -> Self {
         Self { dict: dict.clone(), prefix_match: PrefixMatch::from_dict(&dict) }
     }
 
-    pub fn dict(&self) -> Arc<dyn Dict> {
+    pub fn dict(&self) -> Arc<AnyDict> {
         self.dict.clone()
     }
 
