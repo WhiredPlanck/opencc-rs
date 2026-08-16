@@ -41,6 +41,10 @@ impl Converter {
     pub fn convert(&self, text: &str) -> String {
         let segments = self.segmentation.segment(text);
         let converted = self.conversion_chain.convert(&segments);
-        String::from_iter(converted)
+        let mut output = String::with_capacity(text.len());
+        for segment in converted {
+            output.push_str(&segment);
+        }
+        output
     }
 }

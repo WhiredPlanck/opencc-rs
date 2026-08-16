@@ -20,23 +20,25 @@ pub enum DictGroupMatchPolicy {
     Union
 }
 
-#[derive(Default)]
-pub struct PrefixMatchResult {
-    key: String,
-    value: String,
+/// Result of a prefix lookup, borrowing from the dictionary it was matched
+/// against. Avoiding owned copies here removes two allocations per character
+/// on the conversion hot path.
+pub struct PrefixMatchResult<'a> {
+    key: &'a str,
+    value: &'a str,
 }
 
-impl PrefixMatchResult {
-    pub fn new(key: &str, value: &str) -> Self {
-        Self { key: key.to_string(), value: value.to_string() }
+impl<'a> PrefixMatchResult<'a> {
+    pub fn new(key: &'a str, value: &'a str) -> Self {
+        Self { key, value }
     }
 
-    pub fn key(&self) -> &str {
-        &self.key
+    pub fn key(&self) -> &'a str {
+        self.key
     }
 
-    pub fn value(&self) -> &str {
-        &self.value
+    pub fn value(&self) -> &'a str {
+        self.value
     }
 }
 
@@ -87,7 +89,7 @@ pub trait Dict: Send + Sync {
             .collect()
     }
 
-    fn match_prefix_value(&self, word: &str) -> Option<PrefixMatchResult> {
+    fn match_prefix_value(&self, word: &str) -> Option<PrefixMatchResult<'_>> {
         None
     }
 }

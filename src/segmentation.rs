@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 use crate::{AnyDict, PrefixMatch};
 
@@ -17,15 +17,18 @@ impl Segmentation {
         }
     }
 
-    pub fn segment(&self, text: &str) -> Vec<String> {
+    /// Split the text into segments. Unmatched characters are borrowed from
+    /// `text` directly; only characters that matched a dictionary key are
+    /// allocated as owned segments.
+    pub fn segment<'a>(&self, text: &'a str) -> Vec<Cow<'a, str>> {
         match self {
             Segmentation::MaxMatch { dict: _, prefix_match } => text
-                .chars()
-                .map(|pstr| {
-                    let word = pstr.to_string();
-                    match prefix_match.match_prefix(&word) {
-                        Some(matched) => matched.key().to_string(),
-                        None => word,
+                .char_indices()
+                .map(|(i, ch)| {
+                    let word = &text[i..i + ch.len_utf8()];
+                    match prefix_match.match_prefix(word) {
+                        Some(matched) => Cow::Owned(matched.key().to_string()),
+                        None => Cow::Borrowed(word),
                     }
                 })
                 .collect(),

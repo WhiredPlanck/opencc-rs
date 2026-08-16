@@ -30,8 +30,8 @@ impl MarisaDict {
 
         let mut key_value_map = HashMap::new();
         for entry in that_lexicon.iter() {
-            keyset.push_back_str(entry.key().as_str()).unwrap();
-            key_value_map.insert(entry.key(), DictEntry::new_from_other(&entry));
+            keyset.push_back_str(entry.key()).unwrap();
+            key_value_map.insert(entry.key().to_string(), DictEntry::new_from_other(&entry));
             max_key_length = max(entry.key().len(), max_key_length);
         }
         // Build Marisa Trie

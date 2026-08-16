@@ -48,10 +48,11 @@ impl Dict for TextDict {
     }
 
     fn match_word(&self, word: &str) -> Option<&DictEntry> {
-        let entry= DictEntry::NoValue { key: word.to_string() };
         let lexicon = &self.lexicon;
-        let index = lexicon.partition_point(|x| x < &entry);
-        if index < lexicon.len() {
+        // Binary search with a borrowed key instead of allocating a temporary
+        // DictEntry for every lookup.
+        let index = lexicon.partition_point(|x| x.key() < word);
+        if index < lexicon.len() && lexicon.get(index).key() == word {
             Some(lexicon.get(index))
         } else {
             None
@@ -80,7 +81,9 @@ impl SerializableDict for TextDict {
     fn serialize_to_file(&self, file: &mut File) -> Result<(), Error> {
         let lexicon = &self.lexicon;
         for entry in lexicon.iter() {
-            writeln!(file, "{}", entry.to_string())?;
+            // `Display` writes directly into the file, avoiding the
+            // intermediate String that `entry.to_string()` would allocate.
+            writeln!(file, "{}", entry)?;
         }
         Ok(())
     }

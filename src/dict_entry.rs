@@ -34,25 +34,28 @@ impl DictEntry {
     pub fn new_from_other(other: &DictEntry) -> DictEntry {
         let values = other.values();
         if values.is_empty() {
-            DictEntry::NoValue { key: other.key() }
+            DictEntry::NoValue { key: other.key().to_string() }
         } else if values.len() == 1 {
             DictEntry::StrSingleValue {
-                key: other.key(),
+                key: other.key().to_string(),
                 value: values[0].clone(),
             }
         } else {
             DictEntry::StrMultiValue {
-                key: other.key(),
+                key: other.key().to_string(),
                 values,
             }
         }
     }
 
-    pub fn key(&self) -> String {
+    /// Borrowed key, avoiding the allocation that the owned `String`
+    /// accessor would incur (sorting, lookups and dictionary builds all
+    /// read the key far more often than they need to own it).
+    pub fn key(&self) -> &str {
         match self {
-            DictEntry::NoValue { key } => key.clone(),
-            DictEntry::StrSingleValue { key, .. } => key.clone(),
-            DictEntry::StrMultiValue { key, .. } => key.clone(),
+            DictEntry::NoValue { key } => key,
+            DictEntry::StrSingleValue { key, .. } => key,
+            DictEntry::StrMultiValue { key, .. } => key,
         }
     }
 
@@ -72,16 +75,15 @@ impl DictEntry {
     }
 
     pub fn get_default(&self) -> String {
+        self.get_default_ref().to_string()
+    }
+
+    /// Borrowed variant of [`get_default`](Self::get_default).
+    pub fn get_default_ref(&self) -> &str {
         match self {
-            DictEntry::NoValue { key } => key.clone(),
-            DictEntry::StrSingleValue { key: _, value } => value.clone(),
-            DictEntry::StrMultiValue { key, values } => {
-                if values.is_empty() {
-                    key.clone()
-                } else {
-                    values[0].clone()
-                }
-            }
+            DictEntry::NoValue { key } => key,
+            DictEntry::StrSingleValue { key: _, value } => value,
+            DictEntry::StrMultiValue { key, values } => values.first().map_or(key, |v| v),
         }
     }
 
@@ -90,6 +92,16 @@ impl DictEntry {
             DictEntry::NoValue { key } => key.clone(),
             DictEntry::StrSingleValue { key, value } => format!("{}\t{}", key, value),
             DictEntry::StrMultiValue { key, values } => format!("{}\t{}", key, values.join(" ")),
+        }
+    }
+}
+
+impl std::fmt::Display for DictEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DictEntry::NoValue { key } => write!(f, "{}", key),
+            DictEntry::StrSingleValue { key, value } => write!(f, "{}\t{}", key, value),
+            DictEntry::StrMultiValue { key, values } => write!(f, "{}\t{}", key, values.join(" ")),
         }
     }
 }

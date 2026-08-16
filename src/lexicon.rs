@@ -46,10 +46,10 @@ impl Lexicon {
 
     pub fn is_unique(&self, dupkey: Option<&mut String>) -> bool {
         let entries = &self.entries;
-        for i in 1..entries.len() - 1 {
+        for i in 1..entries.len() {
             if entries[i - 1].key() == entries[i].key() {
                 if let Some(dupkey) = dupkey {
-                    *dupkey = entries[i].key();
+                    *dupkey = entries[i].key().to_string();
                 }
                 return false;
             }

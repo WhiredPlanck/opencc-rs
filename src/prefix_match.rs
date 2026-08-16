@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::{Arc, Weak}};
+use std::{collections::HashMap, fmt::Write, sync::{Arc, Weak}};
 
 use dashmap::DashMap;
 use once_cell::sync::OnceCell;
@@ -32,7 +32,7 @@ enum Matcher {
 }
 
 impl Matcher {
-    fn match_prefix(&self, word: &str) -> Option<PrefixMatchResult> {
+    fn match_prefix(&self, word: &str) -> Option<PrefixMatchResult<'_>> {
         match self {
             Matcher::Leaf(matcher) => matcher.match_prefix(word),
             Matcher::Group(matcher) => match matcher.match_policy {
@@ -71,7 +71,7 @@ impl LeafMatcher {
         node.value = value.to_owned();
     }
 
-    fn match_prefix(&self, word: &str) -> Option<PrefixMatchResult> {
+    fn match_prefix(&self, word: &str) -> Option<PrefixMatchResult<'_>> {
         let mut node = &self.root;
         let mut last_match: Option<&Node> = None;
 
@@ -102,11 +102,11 @@ impl GroupMatcher {
         self.children.push(matcher);
     }
 
-    fn match_prefix_short_circuit(&self, word: &str) -> Option<PrefixMatchResult> {
+    fn match_prefix_short_circuit(&self, word: &str) -> Option<PrefixMatchResult<'_>> {
         self.children.iter().find_map(|child| child.match_prefix(word))
     }
 
-    fn match_prefix_union(&self, word:&str) -> Option<PrefixMatchResult> {
+    fn match_prefix_union(&self, word:&str) -> Option<PrefixMatchResult<'_>> {
         self.children.iter().filter_map(|child| child.match_prefix(word))
             .fold(None, |acc, candidate| {
                 match acc {
@@ -241,7 +241,7 @@ impl PrefixMatch {
         Self { tables: Some(built), single_dict: None }
     }
 
-    pub fn match_prefix(&self, word: &str) -> Option<PrefixMatchResult> {
+    pub fn match_prefix(&self, word: &str) -> Option<PrefixMatchResult<'_>> {
         if let Some(single) = &self.single_dict {
             return single.match_prefix_value(word);
         }
@@ -261,8 +261,8 @@ impl PrefixMatch {
             output.push(']');
         } else {
             let dict_key = dict.identity();
-            output.push_str(&dict_key.to_string());
-            output.push(';');
+            // `write!` avoids the temporary String that `to_string()` would allocate.
+            let _ = write!(output, "{}{}", dict_key, ';');
         }
     }
 
