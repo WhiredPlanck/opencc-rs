@@ -8,6 +8,38 @@ pub mod group;
 pub mod text;
 pub mod marisa;
 
+/// Defines how a dictionary group resolves matches across child dictionaries.
+pub enum DictGroupMatchPolicy {
+    /// Preserve legacy DictGroup behavior: query child dictionaries in order and
+    /// return the first dictionary that has a match. For prefix lookup, this means
+    /// a shorter prefix from an earlier dictionary can win over a longer prefix
+    /// from a later dictionary.
+    ShortCircuit,
+    /// Treat child dictionaries as a union for prefix lookup: the longest prefix
+    /// across all children wins, with dictionary order breaking ties.
+    Union
+}
+
+#[derive(Default)]
+pub struct PrefixMatchResult {
+    key: String,
+    value: String,
+}
+
+impl PrefixMatchResult {
+    pub fn new(key: &str, value: &str) -> Self {
+        Self { key: key.to_string(), value: value.to_string() }
+    }
+
+    pub fn key(&self) -> &str {
+        &self.key
+    }
+
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+}
+
 #[enum_dispatch(Dict)]
 pub enum AnyDict {
     Group(DictGroup),
@@ -24,6 +56,14 @@ pub trait Dict: Send + Sync {
 
     fn dict_group_items(&self) -> Option<&Vec<Arc<AnyDict>>> {
         None
+    }
+
+    fn match_policy(&self) -> DictGroupMatchPolicy {
+        DictGroupMatchPolicy::ShortCircuit
+    }
+
+    fn supports_fast_prefix_match(&self) -> bool {
+        false
     }
 
     fn identity(&self) -> usize;
@@ -45,6 +85,10 @@ pub trait Dict: Send + Sync {
             .take(len)
             .filter_map(|(i, _)| self.match_word(&word[i..]))
             .collect()
+    }
+
+    fn match_prefix_value(&self, word: &str) -> Option<PrefixMatchResult> {
+        None
     }
 }
 

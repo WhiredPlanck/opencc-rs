@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::{Arc, Weak}};
 use dashmap::DashMap;
 use once_cell::sync::OnceCell;
 
-use crate::{AnyDict, Dict};
+use crate::{AnyDict, Dict, DictGroupMatchPolicy, PrefixMatchResult};
 
 struct CacheEntry {
     dicts: Vec<Weak<AnyDict>>,
@@ -26,19 +26,40 @@ struct Node {
     children: HashMap<char, Node>,
 }
 
+enum Matcher {
+    Leaf(LeafMatcher),
+    Group(GroupMatcher)
+}
+
+impl Matcher {
+    fn match_prefix(&self, word: &str) -> Option<PrefixMatchResult> {
+        match self {
+            Matcher::Leaf(matcher) => matcher.match_prefix(word),
+            Matcher::Group(matcher) => match matcher.match_policy {
+                DictGroupMatchPolicy::ShortCircuit => matcher.match_prefix_short_circuit(word),
+                DictGroupMatchPolicy::Union => matcher.match_prefix_union(word)
+            }
+        }
+    } 
+}
+
 #[derive(Default)]
-struct Table {
+struct LeafMatcher {
     root: Node
 }
 
-impl Table {
+impl LeafMatcher {
     fn from_dict(dict: &Arc<AnyDict>) -> Self {
+        let mut matcher = LeafMatcher::default();
+        matcher.add_dict(dict);
+        matcher
+    }
+
+    fn add_dict(&mut self, dict: &Arc<AnyDict>) {
         let lexicon = dict.lexicon();
-        let mut table = Table::default();
         for entry in lexicon.iter() {
-            table.add_entry(&entry.key(), &entry.get_default());
+            self.add_entry(&entry.key(), &entry.get_default());
         }
-        table
     }
 
     fn add_entry(&mut self, key: &str, value: &str) {
@@ -50,11 +71,11 @@ impl Table {
         node.value = value.to_owned();
     }
 
-    fn match_prefix(&self, word: &str) -> Option<MatchResult> {
+    fn match_prefix(&self, word: &str) -> Option<PrefixMatchResult> {
         let mut node = &self.root;
         let mut last_match: Option<&Node> = None;
 
-        for (_, ch) in word.char_indices() {
+        for ch in word.chars() {
             let next = match node.children.get(&ch) {
                 Some(next) => next,
                 None => break,
@@ -63,30 +84,52 @@ impl Table {
             last_match = Some(node);
         }
 
-        last_match.map(|term| MatchResult {
-            key: term.key.to_owned(),
-            value: term.value.to_owned(),
-        })
+        last_match.map(|term| PrefixMatchResult::new(&term.key, &term.value))
+    }
+}
+
+struct GroupMatcher {
+    children: Vec<Matcher>,
+    match_policy: DictGroupMatchPolicy
+}
+
+impl GroupMatcher {
+    fn new(match_policy: DictGroupMatchPolicy) -> Self {
+        Self { children: Vec::new(), match_policy } 
+    }
+
+    fn add_child(&mut self, matcher: Matcher) {
+        self.children.push(matcher);
+    }
+
+    fn match_prefix_short_circuit(&self, word: &str) -> Option<PrefixMatchResult> {
+        self.children.iter().find_map(|child| child.match_prefix(word))
+    }
+
+    fn match_prefix_union(&self, word:&str) -> Option<PrefixMatchResult> {
+        self.children.iter().filter_map(|child| child.match_prefix(word))
+            .fold(None, |acc, candidate| {
+                match acc {
+                    Some(best) => {
+                        if candidate.key().len() > best.key().len() {
+                            Some(candidate)
+                        } else {
+                            Some(best)
+                        }
+                    },
+                    None => Some(candidate)
+                }
+            })
     }
 }
 
 pub struct Tables {
-    tables: Vec<Table>
-}
-
-impl Tables {
-    fn new() -> Self {
-        Self { tables: Vec::new() }
-    }
-}
-
-pub struct MatchResult {
-    pub key: String,
-    pub value: String
+    matcher: Matcher
 }
 
 pub struct PrefixMatch {
-    tables: Arc<Tables>
+    tables: Option<Arc<Tables>>,
+    single_dict: Option<Arc<AnyDict>>
 }
 
 fn same_dicts(cached: &[Weak<AnyDict>], current: &[Weak<AnyDict>]) -> bool {
@@ -106,8 +149,55 @@ fn prune_expired_prefix_match_cache(cache: &DashMap<String, Vec<CacheEntry>>) {
     });
 }
 
+fn can_flatten_as_union(dict: &Arc<AnyDict>) -> bool {
+    dict.dict_group_items().is_none_or(|items| {
+        matches!(dict.match_policy(), DictGroupMatchPolicy::Union) ||
+            items.iter().all(|child| can_flatten_as_union(child))
+    })
+}
+
+fn collect_all_leaf_dicts(dict: &Arc<AnyDict>, out: &mut LeafMatcher) {
+    if let Some(items) = dict.dict_group_items() {
+        for child in items {
+            collect_all_leaf_dicts(child, out);
+        }
+    } else {
+        out.add_dict(dict);
+    }
+}
+
+fn build_matcher(dict: &Arc<AnyDict>) -> Matcher {
+    if let Some(dict_group_items) = dict.dict_group_items() {
+        if can_flatten_as_union(dict) {
+            let mut leaf = LeafMatcher::default();
+            collect_all_leaf_dicts(dict, &mut leaf);
+            return Matcher::Leaf(leaf);
+        }
+        
+        let mut group = GroupMatcher::new(dict.match_policy());
+        for child in dict_group_items {
+            group.add_child(build_matcher(child));
+        }
+        return Matcher::Group(group);
+    }
+    Matcher::Leaf(LeafMatcher::from_dict(dict))
+}
+
 impl PrefixMatch {
     pub fn from_dict(dict: &Arc<AnyDict>) -> Self {
+        let mut actual_dict = Some(dict);
+        while let Some(actual) = actual_dict {
+            if let Some(items) = actual.dict_group_items() && items.len() == 1 {
+                actual_dict = items.first()
+            } else {
+                break;
+            }
+        }
+
+        if let Some(actual) = actual_dict && actual.supports_fast_prefix_match() {
+            return Self { tables: None, single_dict: Some(actual.clone()) }
+        }
+
         static CACHE: OnceCell<DashMap<String, Vec<CacheEntry>>> = OnceCell::new();
         let cache = CACHE.get_or_init(|| DashMap::new());
 
@@ -123,14 +213,13 @@ impl PrefixMatch {
             for entry in cached.iter() {
                 if same_dicts(&entry.dicts, &leave_dicts) {
                     if let Some(tables) = entry.tables.upgrade() {
-                        return Self { tables };
+                        return Self { tables: Some(tables), single_dict: None };
                     }
                 }
             }
         }
 
-        let mut tables = Tables::new();
-        Self::add_dict(&dict, &mut tables);
+        let tables = Tables { matcher: build_matcher(&dict) };
         let built = Arc::new(tables);
 
         prune_expired_prefix_match_cache(&cache);
@@ -142,33 +231,30 @@ impl PrefixMatch {
         });
         for entry in entries.iter() {
             if let Some(tables) = entry.tables.upgrade() {
-                return Self { tables }
+                return Self { tables: Some(tables), single_dict: None }
             }
         }
         entries.push(CacheEntry {
             dicts: leave_dicts,
             tables: Arc::downgrade(&built)
         });
-        Self { tables: built }
+        Self { tables: Some(built), single_dict: None }
     }
 
-    pub fn match_prefix(&self, word: &str) -> Option<MatchResult> {
-        self.tables.tables.iter().find_map(|table| table.match_prefix(word))
-    }
-
-    fn add_dict(dict: &Arc<AnyDict>, output: &mut Tables) {
-        if let Some(dict_group_items) = dict.dict_group_items() {
-            for child in dict_group_items {
-                Self::add_dict(child, output);
-            }
-        } else {
-            output.tables.push(Table::from_dict(dict));
+    pub fn match_prefix(&self, word: &str) -> Option<PrefixMatchResult> {
+        if let Some(single) = &self.single_dict {
+            return single.match_prefix_value(word);
         }
+        self.tables.as_ref().unwrap().matcher.match_prefix(word)
     }
 
     fn append_cache_key(dict: &Arc<AnyDict>, output: &mut String) {
         if let Some(dict_group_items) = dict.dict_group_items() {
             output.push('[');
+            match dict.match_policy() {
+                DictGroupMatchPolicy::ShortCircuit => output.push_str("short_circuit:"),
+                DictGroupMatchPolicy::Union => output.push_str("union:"),
+            }
             for child in dict_group_items {
                 Self::append_cache_key(child, output);
             }

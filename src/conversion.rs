@@ -21,7 +21,7 @@ impl Conversion {
             .map(|pstr| {
                 let word = pstr.to_string();
                 match self.prefix_match.match_prefix(&word) {
-                    Some(matched) => matched.value,
+                    Some(matched) => matched.value().to_string(),
                     None => word
                 }
             })

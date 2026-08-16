@@ -24,7 +24,7 @@ impl Segmentation {
                 .map(|pstr| {
                     let word = pstr.to_string();
                     match prefix_match.match_prefix(&word) {
-                        Some(matched) => matched.key,
+                        Some(matched) => matched.key().to_string(),
                         None => word,
                     }
                 })
